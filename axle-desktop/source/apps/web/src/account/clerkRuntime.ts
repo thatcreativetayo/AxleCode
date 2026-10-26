@@ -65,38 +65,6 @@ export function clerkExternalAuthUrl(state: string): string {
   return url.toString();
 }
 
-/** Starts the browser flow directly with one provider instead of the chooser. */
-export function clerkProviderAuthUrl(state: string, providerId: string): string {
-  const url = new URL(`${workerBaseUrl()}/v1/auth/start`);
-  url.searchParams.set("provider", providerId);
-  url.searchParams.set("redirect_uri", clerkCallbackUrl());
-  url.searchParams.set("state", state);
-  return url.toString();
-}
-
-export type SignInProvider = {
-  readonly id: string;
-  readonly label: string;
-};
-
-/** Providers the auth worker can actually complete right now. */
-export async function fetchSignInProviders(): Promise<readonly SignInProvider[]> {
-  const response = await fetch(`${workerBaseUrl()}/v1/auth/providers`).catch(() => null);
-  if (!response?.ok) return [];
-  const value = (await response.json().catch(() => null)) as {
-    readonly providers?: unknown;
-  } | null;
-  if (!Array.isArray(value?.providers)) return [];
-  const providers: SignInProvider[] = [];
-  for (const entry of value.providers) {
-    if (!entry || typeof entry !== "object") continue;
-    const record = entry as Record<string, unknown>;
-    if (typeof record.id !== "string" || typeof record.label !== "string") continue;
-    providers.push({ id: record.id, label: record.label });
-  }
-  return providers;
-}
-
 export type ClerkBrowserExchange = {
   readonly token: string;
   readonly sessionId: string;

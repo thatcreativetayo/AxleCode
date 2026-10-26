@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowUpRight, FileText } from "lucide-react";
 import { Reveal } from "@/components/fx/reveal";
+import { SITE } from "@/lib/site";
 
 export type LegalSection = {
   id: string;
@@ -67,9 +68,9 @@ export function LegalPage({
               <div className="mt-14 flex items-start gap-4 rounded-2xl border border-white/[0.08] bg-white/[0.015] p-6">
                 <FileText size={20} strokeWidth={1.5} className="mt-1 shrink-0 text-mute" />
                 <div>
-                  <h2 className="text-sm font-medium">Release-specific details.</h2>
-                  <p className="mt-2 text-sm leading-6 text-mute">For release-specific behavior and third-party license notices, consult the version you install.</p>
-                  <Link href="/download" className="mt-4 inline-flex items-center gap-2 text-sm text-paper underline decoration-white/20 underline-offset-4">Download the latest version <ArrowUpRight size={14} /></Link>
+                  <h2 className="text-sm font-medium">Details you can inspect.</h2>
+                  <p className="mt-2 text-sm leading-6 text-mute">For release-specific behavior and license notices, consult the desktop project and the version you install.</p>
+                  <a href={SITE.github} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex items-center gap-2 text-sm text-paper underline decoration-white/20 underline-offset-4">View the project on GitHub <ArrowUpRight size={14} /></a>
                 </div>
               </div>
             </Reveal>

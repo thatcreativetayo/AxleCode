@@ -36,10 +36,10 @@ const REASON_COPY: Record<UpgradeReason, { readonly title: string; readonly desc
     models: {
       title: "This model is included with paid plans",
       description:
-        "Paid plans unlock GLM 5.3, GLM 5.3 Flash, and Nemotron 3 Super, along with monthly credits, cloud schedules, and higher scheduled-task limits.",
+        "Paid plans unlock GLM 5.3, GLM 5.3 Flash, and Nemotron 3 Super, along with monthly credits, cloud jobs, and higher scheduled-task limits.",
     },
     "cloud-jobs": {
-      title: "Cloud jobs are included with Axle Pro",
+      title: "Cloud jobs are part of paid plans",
       description:
         "Cloud jobs run on Axle runners that keep working when this computer is offline, with an included monthly credit bundle.",
     },
@@ -56,12 +56,12 @@ const REASON_COPY: Record<UpgradeReason, { readonly title: string; readonly desc
     plugins: {
       title: "Jira, Notion, Slack, and email plugins are part of paid plans",
       description:
-        "GitHub is included on Free. Paid plans unlock the other plugins, along with the GLM 5.3 and Nemotron families, monthly credits, and cloud schedules.",
+        "GitHub is included on Free. Paid plans unlock the other plugins, along with the GLM 5.3 and Nemotron families, monthly credits, and cloud jobs.",
     },
     "account-menu": {
       title: "Get more out of Axle",
       description:
-        "Paid plans add the GLM 5.3 and Nemotron families, monthly credits, cloud schedules, higher scheduled-task limits, and pull-request reviews.",
+        "Paid plans add the GLM 5.3 and Nemotron families, monthly credits, cloud jobs, higher scheduled-task limits, and pull-request reviews.",
     },
   };
 

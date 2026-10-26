@@ -1,20 +1,21 @@
 import type { Metadata } from "next";
 import { LegalPage, type LegalSection } from "@/components/site/legal-page";
+import { SITE } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Terms & licensing",
-  description: "Read about the desktop license, third-party service terms, and reviewing the work you create.",
+  description: "Read about the desktop source license, third-party service terms, and reviewing the work you create.",
 };
 
 const sections: LegalSection[] = [
   {
     id: "license",
-    heading: "The desktop license",
+    heading: "The desktop source license",
     paragraphs: [
-      "Axle desktop software is proprietary to T3 Tools and its licensors. Your use of the software is governed by the terms you accept when you install or use the app. You may not copy, modify, distribute, sublicense, or create derivative works except as expressly permitted in writing by T3 Tools or by applicable law.",
-      "Consult the license and third-party notices shipped with the version you install for the exact terms and copyright attribution.",
+      "The desktop source included with this project contains an MIT License. It permits use, copying, modification, and distribution, subject to preserving the required copyright and permission notices.",
+      "Consult the LICENSE file and third-party notices shipped with the version you install for the exact terms and copyright attribution. Current desktop releases are published under the Axle project name.",
     ],
-    links: [{ label: "Download the desktop app", href: "/download" }],
+    links: [{ label: "MIT License text", href: "https://opensource.org/license/mit" }, { label: "Project source", href: SITE.github }],
   },
   {
     id: "services",
@@ -37,13 +38,13 @@ const sections: LegalSection[] = [
     id: "warranty",
     heading: "License notices and warranty",
     paragraphs: [
-      "The desktop software is provided “as is,” without warranties of any kind to the extent permitted by law. Refer to the terms shipped with the version you install for the applicable warranty disclaimer and limitation of liability.",
-      "Keep the third-party license and attribution notices required by the software and its dependencies when redistributing a build.",
+      "The MIT License provides the software “as is” and includes a warranty disclaimer and limitation of liability. Refer to the actual license text for those provisions.",
+      "Keep the license and attribution notices required by the software and its dependencies when redistributing a build or derivative work.",
     ],
-    links: [{ label: "Release notes", href: "/changelog" }],
+    links: [{ label: "Published releases", href: SITE.releases }],
   },
 ];
 
 export default function TermsPage() {
-  return <LegalPage eyebrow="The details" title="Terms & licensing" updated="October 26, 2026" intro="The desktop license, connected-service terms, and a few practical responsibilities when building with AI." sections={sections} />;
+  return <LegalPage eyebrow="The details" title="Terms & licensing" updated="October 13, 2026" intro="The desktop source license, connected-service terms, and a few practical responsibilities when building with AI." sections={sections} />;
 }

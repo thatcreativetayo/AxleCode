@@ -28,7 +28,6 @@ import {
   clerkAuthOrigin,
   clerkCallbackUrl,
   clerkExternalAuthUrl,
-  clerkProviderAuthUrl,
   exchangeClerkBrowserCode,
   isClerkFrameMessage,
   restoreClerkSession,
@@ -64,8 +63,8 @@ type AccountState =
 
 interface AccountContextValue {
   readonly account: AccountState;
-  /** Opens the system browser at the Axle sign-in page, optionally for one provider. */
-  readonly signIn: (providerId?: string) => void;
+  /** Opens the system browser at the Axle sign-in page. */
+  readonly signIn: () => void;
   /** Clears the local account and best-effort revokes the server session. */
   readonly signOut: () => void;
   /** Connects an extra sign-in provider to the signed-in account. */
@@ -137,7 +136,7 @@ export function AccountAuthProvider({ children }: { readonly children: ReactNode
   const appliedExternalStateRef = useRef<string | null>(null);
   const externalSessionRef = useRef(false);
   const restoringSessionRef = useRef(true);
-  const signInRef = useRef<(providerId?: string) => void>(() => undefined);
+  const signInRef = useRef<() => void>(() => undefined);
   const signOutRef = useRef<() => void>(() => undefined);
   const linkProviderRef = useRef<(providerId: string) => Promise<void>>(async () => undefined);
   const [state, setState] = useState<AccountState>({
@@ -357,7 +356,7 @@ export function AccountAuthProvider({ children }: { readonly children: ReactNode
       });
     };
 
-    const startExternalAuth = (providerId?: string) => {
+    const startExternalAuth = () => {
       const openExternal = window.desktopBridge?.openExternal;
       if (typeof openExternal !== "function") {
         setState({
@@ -370,11 +369,7 @@ export function AccountAuthProvider({ children }: { readonly children: ReactNode
       }
       const state = window.crypto.randomUUID();
       pendingExternalStateRef.current = state;
-      const authUrl =
-        providerId === undefined
-          ? clerkExternalAuthUrl(state)
-          : clerkProviderAuthUrl(state, providerId);
-      void openExternal(authUrl)
+      void openExternal(clerkExternalAuthUrl(state))
         .then((opened) => {
           if (opened === false) throw new Error("Axle could not open the default browser.");
           void pollExternalSignIn(state, {
@@ -632,7 +627,7 @@ export function AccountAuthProvider({ children }: { readonly children: ReactNode
   const contextValue = useMemo(
     () => ({
       account: state,
-      signIn: (providerId?: string) => signInRef.current(providerId),
+      signIn: () => signInRef.current(),
       signOut: () => signOutRef.current(),
       linkProvider: (providerId: string) => linkProviderRef.current(providerId),
     }),

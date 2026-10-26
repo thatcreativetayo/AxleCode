@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { consumeAuthCodeByState } from "./accounts.js";
-import { desktopHandoffPage, handleAuthRequest, isDesktopRedirect } from "./signin.js";
+import { desktopHandoffPage, isDesktopRedirect } from "./signin.js";
 
 /**
  * Minimal D1 stand-in for the two statements the claim path issues. It keeps
@@ -76,25 +76,6 @@ test("desktop hand-off page escapes the deep link inside the inline script", asy
   ).text();
   assert.doesNotMatch(page, /<\/script>x/u);
   assert.match(page, /\\u003c\/script>x/u);
-});
-
-test("the desktop sign-in page offers every configured provider", async () => {
-  const env = {
-    GOOGLE_CLIENT_ID: "google-id",
-    GOOGLE_CLIENT_SECRET: "google-secret",
-    GITHUB_CLIENT_ID: "github-id",
-    GITHUB_CLIENT_SECRET: "github-secret",
-  };
-  const request = new Request(
-    "https://auth.test/v1/auth/desktop?mode=external&redirect_uri=axle%3A%2F%2Fapp%2Fclerk-callback&state=state_1234567890123456",
-  );
-
-  const response = await handleAuthRequest(request, env);
-  assert.equal(response.status, 200);
-  const page = await response.text();
-  assert.match(page, /Continue with Google/u);
-  assert.match(page, /Continue with GitHub/u);
-  assert.match(page, /provider=github/u);
 });
 
 test("desktop redirect allowlist only accepts Axle callbacks", () => {

@@ -1,4 +1,6 @@
 ---
+import { GITHUB_REPOSITORY_URL, MARKETING_STATS } from "../lib/site";
+
 interface Props {
   title?: string;
   description?: string;
@@ -7,7 +9,7 @@ interface Props {
 
 const {
   title = "Axle",
-  description = "Axle — The control plane for coding agents.",
+  description = "Axle — The open-source control plane for coding agents.",
   pageClass,
 } = Astro.props;
 ---
@@ -37,7 +39,18 @@ const {
             <span class="nav-brand-name">Axle</span>
           </a>
           <div class="nav-right">
-            <a class="nav-download" href="https://axle.llc/download">Download</a>
+            <a
+              class="nav-stars"
+              href={GITHUB_REPOSITORY_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`Star Axle on GitHub — ${MARKETING_STATS.githubStars} stars`}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12 2.3l2.9 5.88 6.49.94-4.7 4.58 1.11 6.47L12 17.12l-5.8 3.05 1.11-6.47-4.7-4.58 6.49-.94L12 2.3z"/>
+              </svg>
+              <span><strong>{MARKETING_STATS.githubStars}</strong> GitHub stars</span>
+            </a>
           </div>
         </div>
       </nav>
@@ -50,9 +63,10 @@ const {
         <div class="footer-inner">
           <div class="footer-brand">
             <img src="/icon.webp" alt="" />
-            <span>&copy; {new Date().getFullYear()} Axle</span>
+            <span>&copy; {new Date().getFullYear()} T3 Tools Inc · MIT licensed</span>
           </div>
           <div class="footer-links">
+            <a href={GITHUB_REPOSITORY_URL} target="_blank" rel="noopener noreferrer">GitHub</a>
             <a href="https://discord.gg/jn4EGJjrvv" target="_blank" rel="noopener noreferrer">Discord</a>
             <a href="/download">Download</a>
             <a href="/terms-of-service">Terms</a>
@@ -322,11 +336,12 @@ const {
     gap: 8px;
   }
 
-  .nav-download {
+  .nav-stars {
     display: inline-flex;
     align-items: center;
+    gap: 7px;
     height: 36px;
-    padding: 0 16px;
+    padding: 0 14px;
     border: 1px solid var(--border);
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.02);
@@ -337,10 +352,20 @@ const {
     transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
   }
 
-  .nav-download:hover {
+  .nav-stars:hover {
     color: var(--fg);
     border-color: var(--border-strong);
     background: rgba(255, 255, 255, 0.04);
+  }
+
+  .nav-stars strong {
+    color: var(--fg);
+    font-weight: 600;
+  }
+
+  .nav-stars svg {
+    color: var(--warn);
+    flex-shrink: 0;
   }
 
   .main {
@@ -432,8 +457,9 @@ const {
       gap: 12px;
     }
 
-    .nav-download {
+    .nav-stars {
       height: 34px;
+      gap: 6px;
       padding: 0 12px;
       font-size: 12px;
     }

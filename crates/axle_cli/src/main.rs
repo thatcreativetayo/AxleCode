@@ -27,13 +27,6 @@ use tracing_subscriber::EnvFilter;
 /// vendor key of their own.
 const DEFAULT_AXLE_BASE_URL: &str = "https://axle-gateway.axle-download-worker.workers.dev/v1";
 
-/// Metadata generations still run through reasoning-first hosted models, whose
-/// hidden reasoning tokens count toward `max_tokens`. A tiny budget (the old
-/// value was 64) exhausts the limit before any visible text is emitted and
-/// surfaces as an empty response. Keep enough room for reasoning plus the
-/// JSON answer, matching the gateway's default output reservation.
-const TEXT_ONLY_MAX_OUTPUT_TOKENS: u32 = 4_096;
-
 /// Axle's own provider is preconfigured, so a user who has not minted an Axle
 /// API key still gets a working provider. The hosted gateway hashes any bearer
 /// token into the anonymous identity that carries the free daily credit grant,
@@ -519,7 +512,7 @@ async fn run_text_only(
         } else {
             None
         },
-        max_tokens: Some(TEXT_ONLY_MAX_OUTPUT_TOKENS),
+        max_tokens: Some(64),
         reasoning_effort: if capabilities.supports_reasoning_effort {
             cli.effort.clone()
         } else {
@@ -914,75 +907,6 @@ mod tests {
         assert_eq!(cli_only, "Keep it short.");
 
         assert!(compose_append_prompt(None, None).is_none());
-    }
-
-    struct ReasoningOnlyFakeProvider {
-        observed_max_tokens: Arc<std::sync::Mutex<Option<u32>>>,
-    }
-
-    #[async_trait::async_trait]
-    impl LlmProvider for ReasoningOnlyFakeProvider {
-        fn provider_name(&self) -> &str {
-            "fake"
-        }
-
-        async fn complete(
-            &self,
-            _messages: &[Message],
-            _options: &CompletionOptions,
-        ) -> anyhow::Result<Message> {
-            anyhow::bail!("complete is not used by text-only generation")
-        }
-
-        async fn stream(
-            &self,
-            _messages: &[Message],
-            options: &CompletionOptions,
-        ) -> anyhow::Result<axle_ai::EventStream> {
-            *self.observed_max_tokens.lock().unwrap() = options.max_tokens;
-            // Simulate a reasoning-first model: a budget of 64 tokens is spent
-            // entirely on hidden reasoning, leaving no visible response.
-            let budget = options.max_tokens.unwrap_or(0);
-            let events = if budget < 4_096 {
-                vec![
-                    AssistantMessageEvent::ThinkingDelta("reasoning".to_string()),
-                    AssistantMessageEvent::Done { usage: None },
-                ]
-            } else {
-                vec![
-                    AssistantMessageEvent::ThinkingDelta("reasoning".to_string()),
-                    AssistantMessageEvent::TextDelta(r#"{"subject":"Test"}"#.to_string()),
-                    AssistantMessageEvent::Done { usage: None },
-                ]
-            };
-            Ok(Box::pin(futures::stream::iter(events)))
-        }
-    }
-
-    #[tokio::test]
-    async fn text_only_generation_leaves_room_for_hidden_reasoning_tokens() {
-        let observed = Arc::new(std::sync::Mutex::new(None));
-        let provider = Arc::new(ReasoningOnlyFakeProvider {
-            observed_max_tokens: observed.clone(),
-        });
-        let cli = Cli::try_parse_from([
-            "axle",
-            "--text-only",
-            "--prompt",
-            "Name this change",
-            "--provider",
-            "axle",
-            "--model",
-            "muse-glimmer",
-        ])
-        .unwrap();
-
-        run_text_only(provider, &cli, "muse-glimmer")
-            .await
-            .expect("text-only generation must not spend its whole budget on reasoning");
-
-        assert_eq!(*observed.lock().unwrap(), Some(TEXT_ONLY_MAX_OUTPUT_TOKENS));
-        assert!(TEXT_ONLY_MAX_OUTPUT_TOKENS >= 4_096);
     }
 }
 

@@ -61,7 +61,6 @@ Configure each provider application to allow the callback on the deployed Worker
 
 ```text
 Google sign-in: https://axle-auth.axle-download-worker.workers.dev/v1/auth/callback/google
-GitHub sign-in: https://axle-auth.axle-download-worker.workers.dev/v1/auth/callback/github
 Gmail:   https://axle-auth.axle-download-worker.workers.dev/v1/plugins/gmail/callback
 Slack:   https://axle-auth.axle-download-worker.workers.dev/v1/plugins/slack/callback
 Jira:    https://axle-auth.axle-download-worker.workers.dev/v1/plugins/jira/callback
@@ -101,18 +100,16 @@ rejects the authorization before the callback if its app configuration is stale.
   Gmail API, and add the `gmail.modify` and `gmail.send` scopes to the consent
   screen.
 
-Google is the primary desktop sign-in provider, and Google requires an exact
-redirect URI match. The URI must be `${PUBLIC_BASE_URL}/v1/auth/callback/google`
-for the deployment, so registering it under an `OAuth client` of type **Web
+Google is the desktop sign-in provider, and Google requires an exact redirect
+URI match. The URI must be `${PUBLIC_BASE_URL}/v1/auth/callback/google` for the
+deployment, so registering it under an `OAuth client` of type **Web
 application** is mandatory — adding the origin under *Authorized JavaScript
 origins* is not enough. Until it is registered, `/v1/auth/start?provider=google`
 reaches Google and comes back with `redirect_uri_mismatch`. `/v1/auth/providers`
 only reports `google` once both `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
 are set.
 
-GitHub sign-in through the Worker uses the same OAuth App as the plugin flow,
-so its callback list must include `${PUBLIC_BASE_URL}/v1/auth/callback/github`
-as well as the loopback callback:
+GitHub intentionally stays on Axle's existing desktop OAuth flow. Its OAuth App should allow the loopback callback:
 
 ```text
 http://127.0.0.1/github/oauth/callback

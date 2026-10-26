@@ -263,7 +263,7 @@ export const PRICING_FAQS = [
   },
   {
     q: "What do the paid plans include?",
-    a: "Paid plans add cloud schedules on an Axle cloud runner, monthly Axle credits, higher scheduled-task limits, and model-assisted pull-request reviews. Each plan builds on the one before it.",
+    a: "Paid plans add cloud jobs, cloud schedules on an Axle cloud runner, monthly Axle credits, higher concurrency, and model-assisted pull-request reviews. Each plan builds on the one before it.",
   },
   {
     q: "Can I use my existing model accounts?",

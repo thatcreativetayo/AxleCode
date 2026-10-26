@@ -1,6 +1,6 @@
 ---
 import Layout from "../layouts/Layout.astro";
-import { downloadUrl } from "../lib/releases";
+import { RELEASES_URL } from "../lib/releases";
 ---
 
 <Layout title="Download — Axle" description="Download Axle for macOS, Windows, or Linux.">
@@ -8,7 +8,7 @@ import { downloadUrl } from "../lib/releases";
   <h1 class="heading">Download Axle</h1>
   <p class="subheading">
     <span id="version-label">Loading latest release&hellip;</span>
-    <a id="changelog-link" class="changelog-link" href="https://axle.llc/changelog" target="_blank" rel="noopener noreferrer">View changelog<span aria-hidden="true"> &#8599;</span></a>
+    <a id="changelog-link" class="changelog-link" href="#" target="_blank" rel="noopener noreferrer" style="display:none">View changelog<span aria-hidden="true"> &#8599;</span></a>
   </p>
 
   <div class="platforms" id="platforms">
@@ -19,11 +19,11 @@ import { downloadUrl } from "../lib/releases";
         <h2 class="platform-name">macOS</h2>
       </div>
       <div class="download-cards">
-        <a class="download-card" data-asset="arm64.dmg" href={downloadUrl("macos-arm64")}>
+        <a class="download-card" data-asset="arm64.dmg" href={RELEASES_URL}>
           <span class="card-arch">Apple Silicon (arm64)</span>
           <span class="card-format">.dmg</span>
         </a>
-        <a class="download-card" data-asset="x64.dmg" href={downloadUrl("macos-x64")}>
+        <a class="download-card" data-asset="x64.dmg" href={RELEASES_URL}>
           <span class="card-arch">Intel (x64)</span>
           <span class="card-format">.dmg</span>
         </a>
@@ -37,7 +37,7 @@ import { downloadUrl } from "../lib/releases";
         <h2 class="platform-name">Windows</h2>
       </div>
       <div class="download-cards">
-        <a class="download-card" data-asset="x64.exe" href={downloadUrl("windows-x64")}>
+        <a class="download-card" data-asset="x64.exe" href={RELEASES_URL}>
           <span class="card-arch">Windows 10, 11</span>
           <span class="card-format">.exe</span>
         </a>
@@ -51,7 +51,7 @@ import { downloadUrl } from "../lib/releases";
         <h2 class="platform-name">Linux</h2>
       </div>
       <div class="download-cards">
-        <a class="download-card" data-asset="x86_64.AppImage" href={downloadUrl("linux-x64")}>
+        <a class="download-card" data-asset="x86_64.AppImage" href={RELEASES_URL}>
           <span class="card-arch">x86_64</span>
           <span class="card-format">AppImage</span>
         </a>
@@ -60,30 +60,52 @@ import { downloadUrl } from "../lib/releases";
   </div>
 
   <p class="releases-link">
-    Looking for release notes? Visit the
-    <a href="https://axle.llc/changelog" target="_blank" rel="noopener noreferrer">
-      Axle changelog<span aria-hidden="true"> &#8599;</span>
+    Looking for older versions? Check the
+    <a href="https://github.com/pingdotgg/t3code/releases" target="_blank" rel="noopener noreferrer">
+      GitHub releases page<span aria-hidden="true"> &#8599;</span>
     </a>
   </p>
   </div>
 </Layout>
 
 <script>
-  import { fetchLatestRelease } from "../lib/releases";
+  import { fetchLatestRelease, RELEASES_URL } from "../lib/releases";
 
   async function init() {
     const versionLabel = document.getElementById("version-label");
+    const cards = document.querySelectorAll<HTMLAnchorElement>(".download-card");
 
     try {
       const release = await fetchLatestRelease();
 
-      if (versionLabel && release.version) {
-        versionLabel.textContent = `Latest (v${release.version})`;
+      if (versionLabel && release.tag_name) {
+        versionLabel.textContent = `Latest (${release.tag_name})`;
       }
+
+      const changelogLink = document.getElementById("changelog-link") as HTMLAnchorElement | null;
+      if (changelogLink && release.html_url) {
+        changelogLink.href = release.html_url;
+        changelogLink.style.display = "";
+      }
+
+      cards.forEach((card) => {
+        const suffix = card.dataset.asset;
+        if (!suffix) return;
+
+        const match = (release.assets ?? []).find((a) => a.name.endsWith(`-${suffix}`));
+        if (match) {
+          card.href = match.browser_download_url;
+        } else {
+          card.href = RELEASES_URL;
+        }
+      });
     } catch {
       if (versionLabel) {
-        versionLabel.textContent = "";
+        versionLabel.textContent = "Could not load release info.";
       }
+      cards.forEach((card) => {
+        card.href = RELEASES_URL;
+      });
     }
   }
 

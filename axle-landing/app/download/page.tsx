@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowDownToLine, ArrowUpRight } from "lucide-react";
+import { ArrowDownToLine, ArrowUpRight, Monitor, Terminal } from "lucide-react";
 import { PageHero } from "@/components/site/page-hero";
-import { AppleIcon, LinuxIcon, WindowsIcon } from "@/components/site/os-icons";
+import { AppleIcon } from "@/components/site/logo";
 import { Button } from "@/components/ui/button";
 import { Reveal, RevealGroup, RevealItem } from "@/components/fx/reveal";
 import { SITE } from "@/lib/site";
@@ -44,7 +44,7 @@ export default function DownloadPage() {
             </RevealItem>
             <RevealItem className="h-full">
               <article className="flex h-full flex-col rounded-[24px] border border-white/[0.08] bg-white/[0.015] p-7 sm:p-9">
-                <WindowsIcon className="mb-9 h-9 w-9" />
+                <Monitor size={33} strokeWidth={1.5} className="mb-9" />
                 <h2 className="text-[25px] font-medium tracking-[-0.035em]">Windows</h2>
                 <p className="mt-2 mb-8 text-sm leading-6 text-mute">Everything you need, in one desktop workspace.</p>
                 <Button href={SITE.download + "?platform=windows-x64"} variant="secondary" className="mt-auto w-full justify-between" ariaLabel="Download Windows x64 installer">
@@ -55,7 +55,7 @@ export default function DownloadPage() {
             </RevealItem>
             <RevealItem className="h-full">
               <article className="flex h-full flex-col rounded-[24px] border border-white/[0.08] bg-white/[0.015] p-7 sm:p-9">
-                <LinuxIcon className="mb-9 h-9 w-9" />
+                <Terminal size={33} strokeWidth={1.5} className="mb-9" />
                 <h2 className="text-[25px] font-medium tracking-[-0.035em]">Linux</h2>
                 <p className="mt-2 mb-8 text-sm leading-6 text-mute">Built for the way you like to work.</p>
                 <Button href={SITE.download + "?platform=linux-x64&format=appimage"} variant="secondary" className="mt-auto w-full justify-between" ariaLabel="Download Linux x64 AppImage">
@@ -69,7 +69,7 @@ export default function DownloadPage() {
           <Reveal>
             <div className="mt-10 flex flex-col gap-5 border-t border-white/[0.08] pt-7 text-sm text-mute sm:flex-row sm:items-center sm:justify-between">
               <p>Looking for another build or release notes?</p>
-              <a href="/changelog" className="inline-flex items-center gap-2 text-paper underline decoration-white/20 underline-offset-4 transition-colors duration-[400ms] hover:decoration-white/70">Read release notes <ArrowUpRight size={15} /></a>
+              <a href={SITE.releases} className="inline-flex items-center gap-2 text-paper underline decoration-white/20 underline-offset-4 transition-colors duration-[400ms] hover:decoration-white/70" target="_blank" rel="noopener noreferrer">Browse GitHub releases <ArrowUpRight size={15} /></a>
             </div>
           </Reveal>
 

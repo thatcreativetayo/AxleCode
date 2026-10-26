@@ -3,7 +3,6 @@ import { RouterProvider } from "@tanstack/react-router";
 import { describe, expect, it } from "vite-plus/test";
 
 import { AccountAuthProvider } from "./account/AccountAuthProvider";
-import { AccountGate } from "./account/AccountGate";
 import { ElectronBrowserHost } from "./browser/ElectronBrowserHost";
 import { PluginAuthorizationCardHost } from "./components/plugins/PluginAuthorizationCardHost";
 import { PreviewAutomationHosts } from "./components/preview/PreviewAutomationHosts";
@@ -27,13 +26,7 @@ describe("AppRoot", () => {
       ? Children.toArray(accountRoot.props.children)
       : [];
     expect(accountChildren).toHaveLength(2);
-    const accountGate = accountChildren[0];
-    expect(isValidElement(accountGate) && accountGate.type).toBe(AccountGate);
-    const gatedChildren = isValidElement<{ readonly children: ReactNode }>(accountGate)
-      ? Children.toArray(accountGate.props.children)
-      : [];
-    expect(gatedChildren).toHaveLength(1);
-    expect(isValidElement(gatedChildren[0]) && gatedChildren[0].type).toBe(RouterProvider);
+    expect(isValidElement(accountChildren[0]) && accountChildren[0].type).toBe(RouterProvider);
     expect(isValidElement(accountChildren[1]) && accountChildren[1].type).toBe(
       PluginAuthorizationCardHost,
     );

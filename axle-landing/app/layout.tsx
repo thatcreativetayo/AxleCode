@@ -5,7 +5,6 @@ import { GrainOverlay } from "@/components/fx/grain-overlay";
 import { SmoothScroll } from "@/components/site/smooth-scroll";
 import { Navbar } from "@/components/site/navbar";
 import { Footer } from "@/components/site/footer";
-import { BetterUmamiAnalytics } from "@/components/site/better-umami-analytics";
 
 const display = Inter({
   subsets: ["latin"],
@@ -36,7 +35,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Footer />
         </SmoothScroll>
         <GrainOverlay />
-        <BetterUmamiAnalytics />
       </body>
     </html>
   );

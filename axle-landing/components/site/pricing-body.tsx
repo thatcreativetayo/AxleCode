@@ -28,7 +28,7 @@ export function PricingBody() {
         <SectionHead
           eyebrow="All the details"
           title="Know what you're getting."
-          copy="The core workspace is free. Paid plans add cloud schedules, monthly credits, and higher limits."
+          copy="The core workspace is free. Paid plans add cloud runs, monthly credits, and higher limits."
         />
         <Reveal className="mt-12">
           <ComparisonTable />

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { LegalPage, type LegalSection } from "@/components/site/legal-page";
+import { SITE } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Security",
@@ -9,12 +10,12 @@ export const metadata: Metadata = {
 const sections: LegalSection[] = [
   {
     id: "releases",
-    heading: "Start with the official release",
+    heading: "Start with the project’s releases",
     paragraphs: [
-      "Download Axle from the official Axle download page. Match the installer to your operating system and architecture, and keep the app and your operating system up to date.",
+      "Use the project’s download service or published GitHub releases. Match the installer to your operating system and architecture, and keep the app and your operating system up to date.",
       "Review the release information for the version you install. Desktop builds currently use the Axle project name.",
     ],
-    links: [{ label: "Download the desktop app", href: "/download" }, { label: "Release notes", href: "/changelog" }],
+    links: [{ label: "Download the desktop app", href: "/download" }, { label: "GitHub releases", href: SITE.releases }],
   },
   {
     id: "permissions",
@@ -37,13 +38,13 @@ const sections: LegalSection[] = [
     id: "reporting",
     heading: "Report a problem",
     paragraphs: [
-      "If you believe you have found a security vulnerability, contact the Axle security team before sharing sensitive details publicly. Keep private data and credentials out of any public report.",
-      "For a non-sensitive bug, include the app version, operating system, steps to reproduce, and a description of the expected result.",
+      "Check the repository’s Security tab for the current vulnerability-reporting options before sharing sensitive details. Keep private data and credentials out of public reports.",
+      "For a non-sensitive bug, include the app version, operating system, steps to reproduce, and a description of the expected result in a GitHub issue.",
     ],
-    links: [{ label: "Contact security", href: "mailto:security@ping.gg" }],
+    links: [{ label: "Repository security", href: SITE.github + "/security" }, { label: "Report a non-sensitive bug", href: SITE.issues }],
   },
 ];
 
 export default function SecurityPage() {
-  return <LegalPage eyebrow="The details" title="Security, in practice." updated="October 26, 2026" intro="A workspace connects powerful tools. Here are practical ways to manage that access and protect the projects you work on." sections={sections} />;
+  return <LegalPage eyebrow="The details" title="Security, in practice." updated="October 13, 2026" intro="A workspace connects powerful tools. Here are practical ways to manage that access and protect the projects you work on." sections={sections} />;
 }

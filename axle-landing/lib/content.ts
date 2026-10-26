@@ -169,8 +169,8 @@ export const FAQS = [
     a: "Team is priced per seat with a shared pool of inference credits. Seats are added and removed at any time and the difference is prorated on the next invoice. Annual billing takes two months off the total.",
   },
   {
-    q: "Does Axle work offline?",
-    a: "The local workspace, your projects, and your saved threads stay available offline. Model calls still need a connection to the provider you choose.",
+    q: "Is there a discount for open source?",
+    a: "Maintainers of public projects get Pro at no cost. Apply from the company page and include a link to the repository you maintain.",
   },
   {
     q: "Can I cancel whenever?",

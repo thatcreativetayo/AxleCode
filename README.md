@@ -23,7 +23,7 @@ Think of it as a pair programmer sitting inside your machine. You keep your keyb
 
 ## Install
 
-1. Open the [Axle download page](https://axle.llc/download).
+1. Open the [Releases page](https://github.com/thatcreativetayo/AxleCode/releases).
 2. Download the file for your operating system:
    - Windows: `Axle-x64.exe` (installer)
    - macOS: `Axle-arm64.dmg` (Apple silicon) or `Axle-x64.dmg` (Intel)
@@ -110,4 +110,4 @@ pnpm dist:desktop:linux:deb    # Linux deb
 
 ## License
 
-Axle is proprietary software. Copyright © T3 Tools, Inc. All rights reserved.
+MIT - see [axle-desktop/source/LICENSE](axle-desktop/source/LICENSE).

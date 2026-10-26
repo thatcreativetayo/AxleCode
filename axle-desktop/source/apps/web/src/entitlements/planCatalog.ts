@@ -68,7 +68,7 @@ export const PLAN_DISPLAY: Record<PlanTier, PlanDisplay> = {
       "Everything in Pro",
       "4,000 Axle credits every month",
       "Up to 100 scheduled tasks",
-      "More concurrent cloud schedules",
+      "More concurrent cloud jobs",
     ],
   },
   ultra: {
@@ -81,7 +81,7 @@ export const PLAN_DISPLAY: Record<PlanTier, PlanDisplay> = {
       "Everything in Pro+",
       "10,000 Axle credits every month",
       "Up to 200 scheduled tasks",
-      "The highest cloud-schedule concurrency",
+      "The highest cloud-job concurrency",
     ],
   },
 };

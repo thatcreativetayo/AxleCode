@@ -1,33 +1,28 @@
-const DOWNLOAD_BASE_URL = "https://axle-download.axle-download-worker.workers.dev";
+const REPO = "pingdotgg/t3code";
 
-export const DOWNLOAD_URL = "https://axle.llc/download";
+export const RELEASES_URL = `https://github.com/${REPO}/releases`;
 
-const MANIFEST_URL = `${DOWNLOAD_BASE_URL}/get/manifest`;
-const CACHE_KEY = "axle-latest-release";
+const API_URL = `https://api.github.com/repos/${REPO}/releases/latest`;
+const CACHE_KEY = "t3code-latest-release";
 
-export interface ReleaseFile {
+export interface ReleaseAsset {
   name: string;
-  platform: string;
+  browser_download_url: string;
 }
 
 export interface Release {
-  version: string;
-  publishedAt: string | null;
-  changelog: string;
-  files: ReleaseFile[];
-}
-
-export function downloadUrl(platform: string): string {
-  return `${DOWNLOAD_BASE_URL}/get?platform=${encodeURIComponent(platform)}`;
+  tag_name: string;
+  html_url: string;
+  assets: ReleaseAsset[];
 }
 
 export async function fetchLatestRelease(): Promise<Release> {
   const cached = sessionStorage.getItem(CACHE_KEY);
   if (cached) return JSON.parse(cached);
 
-  const data = await fetch(MANIFEST_URL).then((r) => r.json());
+  const data = await fetch(API_URL).then((r) => r.json());
 
-  if (data?.version && data?.files) {
+  if (data?.assets) {
     sessionStorage.setItem(CACHE_KEY, JSON.stringify(data));
   }
 

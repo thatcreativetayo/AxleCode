@@ -31,7 +31,7 @@
 
 ## Reference Repos
 
-- Codex reference repo: https://github.com/openai/codex
+- Open-source Codex repo: https://github.com/openai/codex
 
 Use these as implementation references when designing protocol handling, UX flows, and operational safeguards.
 

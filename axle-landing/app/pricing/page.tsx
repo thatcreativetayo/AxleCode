@@ -6,7 +6,7 @@ import { CTASection } from "@/components/site/cta-section";
 export const metadata: Metadata = {
   title: "Pricing",
   description:
-    "Start free with your own model keys, then upgrade to Pro, Pro+, or Ultra in the app for cloud schedules, monthly credits, and higher limits.",
+    "Start free with your own model keys, then upgrade to Pro, Pro+, or Ultra in the app for cloud jobs, monthly credits, and higher limits.",
 };
 
 export default function PricingPage() {
@@ -21,7 +21,7 @@ export default function PricingPage() {
             <span className="text-mute">The workspace is on us.</span>
           </>
         }
-        copy="Download Axle for free. Bring your own model keys, point it at any OpenAI-compatible endpoint, or keep inference on your own machine. Paid plans add cloud schedules, more credits, and higher limits."
+        copy="Download Axle for free. Bring your own model keys, point it at any OpenAI-compatible endpoint, or keep inference on your own machine. Paid plans add cloud runs, more credits, and higher limits."
       />
       <PricingBody />
       <CTASection

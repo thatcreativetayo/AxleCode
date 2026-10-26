@@ -27,4 +27,32 @@ There's no public docs site yet, checkout the miscellaneous markdown files in [d
 - [Operations](./docs/operations/ci.md)
 - [Reference](./docs/reference/encyclopedia.md)
 
+## If you REALLY want to contribute still.... read this first
+
+### Install `vp`
+
+Axle uses Vite+ so you'll need to install the global `vp` command-line tool.
+
+#### macOS / Linux
+
+```bash
+curl -fsSL https://vite.plus | bash
+```
+
+#### Windows
+
+```bash
+irm https://vite.plus/ps1 | iex
+```
+
+Checkout their getting started guide for more information: https://viteplus.dev/guide/
+
+### Install dependencies
+
+```bash
+vp i
+```
+
+Read [CONTRIBUTING.md](./CONTRIBUTING.md) before opening an issue or PR.
+
 Need support? Join the [Discord](https://discord.gg/jn4EGJjrvv).

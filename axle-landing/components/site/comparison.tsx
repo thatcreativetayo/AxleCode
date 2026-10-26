@@ -23,11 +23,12 @@ const GROUPS: readonly { group: string; rows: readonly Row[] }[] = [
   {
     group: "Cloud",
     rows: [
+      { label: "Cloud jobs", values: [false, true, true, true] },
       {
         label: "Cloud schedules",
         values: [false, "Up to 50", "Up to 100", "Up to 200"],
       },
-      { label: "Concurrent cloud schedules", values: ["—", "4", "6", "8"] },
+      { label: "Concurrent cloud jobs", values: ["—", "4", "6", "8"] },
       {
         label: "Axle credits",
         values: ["100 / day", "2,000 / mo", "4,000 / mo", "10,000 / mo"],
