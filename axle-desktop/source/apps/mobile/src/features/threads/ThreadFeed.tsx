@@ -1,5 +1,4 @@
 import * as Haptics from "expo-haptics";
-import { KeyboardAwareLegendList } from "@legendapp/list/keyboard";
 import { type LegendListRef } from "@legendapp/list/react-native";
 import type { EnvironmentId, MessageId, ThreadId, TurnId } from "@axle/contracts";
 import { CHAT_LIST_ANCHOR_OFFSET, resolveChatListAnchoredEndSpace } from "@axle/shared/chatList";
@@ -23,7 +22,7 @@ import {
   type CustomRenderers,
   type NodeStyleOverrides,
   type PartialMarkdownTheme,
-} from "react-native-nitro-markdown";
+} from "../../lib/markdown";
 import {
   ActivityIndicator,
   Image,
@@ -50,6 +49,7 @@ import Animated, {
   LinearTransition,
   type SharedValue,
 } from "react-native-reanimated";
+import { KeyboardAwareLegendList } from "../../lib/keyboard";
 import { useThemeColor } from "../../lib/useThemeColor";
 import { useFontFamily } from "../../lib/useFontFamily";
 import { copyTextWithHaptic } from "../../lib/copyTextWithHaptic";

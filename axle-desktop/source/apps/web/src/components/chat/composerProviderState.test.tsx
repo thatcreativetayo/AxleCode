@@ -6,6 +6,7 @@ import {
   type ProviderOptionSelection,
   type ServerProviderModel,
 } from "@axle/contracts";
+import { formatContextWindowOptionLabel, getPrimarySelectDescriptor } from "./TraitsPicker";
 import {
   getComposerPromptInjectionState,
   getComposerProviderState,
@@ -280,5 +281,23 @@ describe("provider traits render guards", () => {
     expect(content).not.toBeNull();
     const traitsControl = content as ReactElement<{ input: TraitsRenderInput }>;
     expect(traitsControl.props.input).toMatchObject({ nested: true, model: MODEL, models });
+  });
+});
+
+describe("trait selector ordering and labels", () => {
+  it("prefers reasoning over context window when choosing the primary effort control", () => {
+    const contextWindow = selectDescriptor("contextWindow", [
+      { id: "258400", label: "258400", isDefault: true },
+    ]);
+    const reasoning = selectDescriptor("reasoningEffort", [
+      { id: "high", label: "High", isDefault: true },
+    ]);
+
+    expect(getPrimarySelectDescriptor([contextWindow, reasoning])?.id).toBe("reasoningEffort");
+  });
+
+  it("formats raw token counts as thousands while preserving existing labels", () => {
+    expect(formatContextWindowOptionLabel("258400")).toBe("258.4K");
+    expect(formatContextWindowOptionLabel("1m")).toBe("1m");
   });
 });

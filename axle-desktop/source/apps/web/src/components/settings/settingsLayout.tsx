@@ -68,6 +68,7 @@ export function SettingsRow({
   return (
     <div
       {...rowProps}
+      data-slot="settings-row"
       className={cn(
         "min-w-0 border-t border-border/60 first:border-t-0",
         children ? "pt-5 pb-0" : "py-5",

@@ -1,4 +1,3 @@
-import { isLiquidGlassSupported, LiquidGlassView } from "@callstack/liquid-glass";
 import type { ComposerTriggerKind } from "@axle/shared/composerTrigger";
 import type { ServerProviderSkill, ServerProviderSlashCommand } from "@axle/contracts";
 import { SymbolView } from "../../components/AppSymbol";
@@ -7,6 +6,7 @@ import { Pressable, ScrollView, useColorScheme, View, type ViewStyle } from "rea
 
 import { AppText as Text } from "../../components/AppText";
 import { PierreEntryIcon } from "../../components/PierreEntryIcon";
+import { isLiquidGlassSupported, LiquidGlassView } from "../../lib/liquidGlass";
 import { useThemeColor } from "../../lib/useThemeColor";
 export type ComposerCommandItem =
   | {

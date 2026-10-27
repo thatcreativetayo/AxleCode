@@ -15,6 +15,8 @@ import {
   normalizeCodexOAuthEffectiveContextWindowTokens,
   readCodexOAuthContextWindow,
 } from "../codexContextWindow.ts";
+import { LOCAL_MODEL_PACKS } from "../../localModels/catalog.ts";
+import { readInstalledPackIds } from "../../localModels/manager.ts";
 
 type FetchImplementation = typeof globalThis.fetch;
 
@@ -31,7 +33,8 @@ type ProviderDefinition = {
     | "MISTRAL_API_KEY"
     | "DEEPSEEK_API_KEY"
     | "XAI_API_KEY"
-    | "AXLE_API_KEY";
+    | "AXLE_API_KEY"
+    | "AXLE_LOCAL_API_KEY";
   readonly prefix:
     | "openai-codex"
     | "openai"
@@ -45,7 +48,8 @@ type ProviderDefinition = {
     | "mistral"
     | "deepseek"
     | "xai"
-    | "axle";
+    | "axle"
+    | "axle-local";
   readonly label:
     | "OpenAI Codex"
     | "OpenAI"
@@ -59,7 +63,8 @@ type ProviderDefinition = {
     | "Mistral"
     | "DeepSeek"
     | "xAI"
-    | "Axle";
+    | "Axle"
+    | "Axle Offline";
   readonly load: (
     apiKey: string,
     fetchImplementation: FetchImplementation,
@@ -742,6 +747,7 @@ const BUILT_IN_ENV_PREFIXES: ReadonlySet<string> = new Set([
   "DEEPSEEK",
   "XAI",
   "AXLE",
+  "AXLE_LOCAL",
 ]);
 
 const CUSTOM_BASE_URL_VARIABLE = /^([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*)_BASE_URL$/u;
@@ -1022,6 +1028,35 @@ export type CodexModelLoader = (
 const loadCodexModelsForDiscovery: CodexModelLoader = (environment) =>
   loadCodexModels("authenticated", globalThis.fetch, environment);
 
+/**
+ * Axle Offline models come from the packs this machine has already installed.
+ * The state file is the source of truth, so a pack appears in the picker only
+ * after its download and checksum have finished.
+ */
+async function loadAxleLocalModels(
+  _apiKey: string,
+  _fetchImplementation: FetchImplementation,
+  environment: NodeJS.ProcessEnv,
+): Promise<ReadonlyArray<RemoteModel>> {
+  const statePath = environment.AXLE_LOCAL_MODELS_STATE_PATH?.trim();
+  if (!statePath) return [];
+  const installed = await readInstalledPackIds(statePath);
+  return LOCAL_MODEL_PACKS.filter((pack) => installed.has(pack.id)).map((pack) => ({
+    id: pack.id,
+    name: `${pack.name} · ${pack.model}`,
+    reasoningSupported: false,
+    contextWindows: [
+      {
+        id: "32k",
+        tokens: pack.contextWindowTokens,
+        label: `${Math.round(pack.contextWindowTokens / 1024)}K`,
+      },
+    ],
+    defaultContextWindowTokens: pack.contextWindowTokens,
+    contextWindowSource: "provider",
+  }));
+}
+
 const PROVIDERS: ReadonlyArray<ProviderDefinition> = [
   // Axle's own provider. It is configured by the app, not by the user: the
   // gateway, the model catalog, and the free daily credits are all part of the
@@ -1039,6 +1074,12 @@ const PROVIDERS: ReadonlyArray<ProviderDefinition> = [
         modelsDev,
         "axle",
       ),
+  },
+  {
+    env: "AXLE_LOCAL_API_KEY",
+    prefix: "axle-local",
+    label: "Axle Offline",
+    load: loadAxleLocalModels,
   },
   {
     prefix: "openai-codex",
@@ -1182,6 +1223,10 @@ function isProviderAvailable(
 ): boolean {
   if (provider.prefix === "ollama-cloud") {
     return environment.OLLAMA_CLOUD_CONFIGURED === "true";
+  }
+  if (provider.prefix === "axle-local") {
+    const statePath = environment.AXLE_LOCAL_MODELS_STATE_PATH?.trim();
+    return statePath !== undefined && NodeFS.existsSync(statePath);
   }
   if (provider.env === undefined) {
     return hasCodexOAuthAuthentication(environment);

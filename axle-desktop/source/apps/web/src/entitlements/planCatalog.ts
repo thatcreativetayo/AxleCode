@@ -53,6 +53,7 @@ export const PLAN_DISPLAY: Record<PlanTier, PlanDisplay> = {
       "Everything in Free",
       "GLM 5.3, GLM 5.3 Flash, and Nemotron 3 Super",
       "2,000 Axle credits every month",
+      "Axle Offline Compact and Standard packs",
       "Up to 50 scheduled tasks",
       "Model-assisted pull-request reviews",
       "Cloud jobs that keep running when you are offline",
@@ -66,6 +67,7 @@ export const PLAN_DISPLAY: Record<PlanTier, PlanDisplay> = {
     tagline: "Heavier work, longer runs, more of everything.",
     highlights: [
       "Everything in Pro",
+      "Axle Offline Advanced and Coder packs",
       "4,000 Axle credits every month",
       "Up to 100 scheduled tasks",
       "More concurrent cloud jobs",
@@ -79,6 +81,7 @@ export const PLAN_DISPLAY: Record<PlanTier, PlanDisplay> = {
     tagline: "The whole engine, with the limits taken off.",
     highlights: [
       "Everything in Pro+",
+      "Axle Offline Max and Vision packs",
       "10,000 Axle credits every month",
       "Up to 200 scheduled tasks",
       "The highest cloud-job concurrency",

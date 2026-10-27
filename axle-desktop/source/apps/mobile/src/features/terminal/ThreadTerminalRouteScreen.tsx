@@ -6,12 +6,6 @@ import { NativeHeaderToolbar, NativeStackScreenOptions } from "../../native/Stac
 import { StackActions, useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Platform, Pressable, View, useColorScheme } from "react-native";
-import {
-  KeyboardController,
-  KeyboardEvents,
-  KeyboardStickyView,
-  useKeyboardState,
-} from "react-native-keyboard-controller";
 
 import { AndroidHeaderIconButton, AndroidScreenHeader } from "../../components/AndroidScreenHeader";
 import {
@@ -22,6 +16,12 @@ import {
 import { ControlPillMenu } from "../../components/ControlPill";
 import { EmptyState } from "../../components/EmptyState";
 import { GlassSurface } from "../../components/GlassSurface";
+import {
+  KeyboardController,
+  KeyboardEvents,
+  KeyboardStickyView,
+  useKeyboardState,
+} from "../../lib/keyboard";
 import { LoadingScreen } from "../../components/LoadingScreen";
 import { environmentCatalog } from "../../connection/catalog";
 import { useEnvironmentPresentation } from "../../state/presentation";

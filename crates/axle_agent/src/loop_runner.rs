@@ -2024,8 +2024,14 @@ pub struct AgentLoop {
     provider: Arc<dyn LlmProvider>,
     tool_registry: ToolRegistry,
     event_bus: EventBus,
+    pending_background_tools: tokio::sync::Mutex<HashMap<String, PendingBackgroundTool>>,
     compaction: CompactionEngine,
     options: AgentLoopOptions,
+}
+
+struct PendingBackgroundTool {
+    tool_call_id: String,
+    tool_name: String,
 }
 
 fn is_end_task_tool(tool_call: &ToolCall) -> bool {
@@ -2105,9 +2111,22 @@ impl AgentLoop {
             provider,
             tool_registry,
             event_bus,
+            pending_background_tools: tokio::sync::Mutex::new(HashMap::new()),
             compaction: CompactionEngine::default(),
             options,
         }
+    }
+
+    /// Update the per-turn policy used by a long-lived agent process. The
+    /// persistent JSON stream calls this before each turn because the desktop
+    /// can switch between build and plan mode without restarting the CLI.
+    pub fn set_turn_context(
+        &mut self,
+        interaction_mode: InteractionMode,
+        memory_context: Option<String>,
+    ) {
+        self.options.interaction_mode = interaction_mode;
+        self.options.memory_context = memory_context;
     }
 
     pub async fn run_turn(
@@ -2735,14 +2754,42 @@ impl AgentLoop {
             .await;
 
         if emit_events {
-            self.event_bus.emit(&AxleEvent::ToolExecutionEnd {
-                tool_call_id: tool_call.id.clone(),
-                tool_name: tool_call.name.clone(),
-                output: result.output.clone(),
-                is_error: result.is_error,
-                duration_ms: result.duration_ms,
-                timed_out: result.timed_out,
-            });
+            if let Some(job_id) = result.background_job_id.as_ref() {
+                self.pending_background_tools.lock().await.insert(
+                    job_id.clone(),
+                    PendingBackgroundTool {
+                        tool_call_id: tool_call.id.clone(),
+                        tool_name: tool_call.name.clone(),
+                    },
+                );
+                self.event_bus.emit(&AxleEvent::ToolExecutionBackground {
+                    tool_call_id: tool_call.id.clone(),
+                    tool_name: tool_call.name.clone(),
+                    job_id: job_id.clone(),
+                });
+            } else {
+                self.event_bus.emit(&AxleEvent::ToolExecutionEnd {
+                    tool_call_id: tool_call.id.clone(),
+                    tool_name: tool_call.name.clone(),
+                    output: result.output.clone(),
+                    is_error: result.is_error,
+                    duration_ms: result.duration_ms,
+                    timed_out: result.timed_out,
+                });
+            }
+
+            if let Some(job_id) = result.completed_background_job_id.as_ref() {
+                if let Some(pending) = self.pending_background_tools.lock().await.remove(job_id) {
+                    self.event_bus.emit(&AxleEvent::ToolExecutionEnd {
+                        tool_call_id: pending.tool_call_id,
+                        tool_name: pending.tool_name,
+                        output: result.output.clone(),
+                        is_error: result.is_error,
+                        duration_ms: result.duration_ms,
+                        timed_out: result.timed_out,
+                    });
+                }
+            }
         }
 
         result

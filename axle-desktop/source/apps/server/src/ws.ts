@@ -84,6 +84,7 @@ import * as ServerRuntimeStartup from "./serverRuntimeStartup.ts";
 import * as ServerSettings from "./serverSettings.ts";
 import * as TerminalManager from "./terminal/Manager.ts";
 import * as PreviewAutomationBroker from "./mcp/PreviewAutomationBroker.ts";
+import { listExternalMcpTools } from "./mcp/ExternalMcp.ts";
 import * as PreviewManager from "./preview/Manager.ts";
 import { issueAssetUrl } from "./assets/AssetAccess.ts";
 import * as PortScanner from "./preview/PortScanner.ts";
@@ -365,6 +366,7 @@ const RPC_REQUIRED_SCOPE = new Map<string, AuthEnvironmentScope>([
   [WS_METHODS.serverRemoveKeybinding, AuthOrchestrationOperateScope],
   [WS_METHODS.serverGetSettings, AuthOrchestrationReadScope],
   [WS_METHODS.serverUpdateSettings, AuthOrchestrationOperateScope],
+  [WS_METHODS.serverCheckMcpServers, AuthOrchestrationReadScope],
   [WS_METHODS.serverDiscoverSourceControl, AuthOrchestrationReadScope],
   [WS_METHODS.serverGetTraceDiagnostics, AuthOrchestrationReadScope],
   [WS_METHODS.serverGetProcessDiagnostics, AuthOrchestrationReadScope],
@@ -607,13 +609,21 @@ const makeWsRpcLayer = (
           ),
         );
 
-      const appendSetupScriptActivity = (input: {
+      const appendThreadActivity = (input: {
         readonly threadId: ThreadId;
-        readonly kind: "setup-script.requested" | "setup-script.started" | "setup-script.failed";
+        readonly kind:
+          | "setup-script.requested"
+          | "setup-script.started"
+          | "setup-script.failed"
+          | "tool.started"
+          | "tool.updated"
+          | "tool.completed"
+          | "worktree.preparing"
+          | "worktree.ready";
         readonly summary: string;
         readonly createdAt: string;
         readonly payload: Record<string, unknown>;
-        readonly tone: "info" | "error";
+        readonly tone: "info" | "tool" | "error";
       }) =>
         Effect.all({
           commandId: serverCommandId("setup-script-activity"),
@@ -914,12 +924,13 @@ const makeWsRpcLayer = (
           const bootstrap = command.bootstrap;
           const { bootstrap: _bootstrap, ...finalTurnStartCommand } = command;
           let createdThread = false;
+          let recordedUserMessage = false;
           let targetProjectId = bootstrap?.createThread?.projectId;
           let targetProjectCwd = bootstrap?.prepareWorktree?.projectCwd;
           let targetWorktreePath = bootstrap?.createThread?.worktreePath ?? null;
 
           const cleanupCreatedThread = () =>
-            createdThread
+            createdThread && !recordedUserMessage
               ? serverCommandId("bootstrap-thread-delete").pipe(
                   Effect.flatMap((commandId) =>
                     dispatchAsCurrentSession({
@@ -938,7 +949,7 @@ const makeWsRpcLayer = (
             readonly worktreePath: string;
           }) => {
             const detail = projectSetupScriptCompatibilityDetail(input.error);
-            return appendSetupScriptActivity({
+            return appendThreadActivity({
               threadId: command.threadId,
               kind: "setup-script.failed",
               summary: "Setup script failed to start",
@@ -976,7 +987,7 @@ const makeWsRpcLayer = (
                 worktreePath: input.worktreePath,
               };
               yield* Effect.all([
-                appendSetupScriptActivity({
+                appendThreadActivity({
                   threadId: command.threadId,
                   kind: "setup-script.requested",
                   summary: "Starting setup script",
@@ -984,7 +995,7 @@ const makeWsRpcLayer = (
                   payload,
                   tone: "info",
                 }),
-                appendSetupScriptActivity({
+                appendThreadActivity({
                   threadId: command.threadId,
                   kind: "setup-script.started",
                   summary: "Setup script started",
@@ -1066,6 +1077,33 @@ const makeWsRpcLayer = (
             }
 
             if (bootstrap?.prepareWorktree) {
+              yield* dispatchAsCurrentSession({
+                type: "thread.message.record",
+                commandId: yield* serverCommandId("bootstrap-thread-message"),
+                threadId: command.threadId,
+                message: command.message,
+                createdAt: command.createdAt,
+              });
+              recordedUserMessage = true;
+              const worktreeToolCallId = yield* serverEventId;
+              const preparingAt = yield* nowIso;
+              yield* appendThreadActivity({
+                threadId: command.threadId,
+                kind: "tool.started",
+                summary: "Creating worktree",
+                createdAt: preparingAt,
+                payload: {
+                  toolName: "create_worktree",
+                  toolCallId: worktreeToolCallId,
+                  title: "Creating worktree",
+                  status: "inProgress",
+                  data: {
+                    baseBranch: bootstrap.prepareWorktree.baseBranch,
+                    branch: bootstrap.prepareWorktree.branch ?? null,
+                  },
+                },
+                tone: "tool",
+              });
               let worktreeBaseRef = bootstrap.prepareWorktree.baseBranch;
               if (bootstrap.prepareWorktree.startFromOrigin) {
                 yield* gitWorkflow.fetchRemote({
@@ -1095,6 +1133,23 @@ const makeWsRpcLayer = (
                 worktreePath: targetWorktreePath,
               });
               yield* refreshGitStatus(targetWorktreePath);
+              yield* appendThreadActivity({
+                threadId: command.threadId,
+                kind: "tool.completed",
+                summary: "Worktree ready",
+                createdAt: yield* nowIso,
+                payload: {
+                  toolName: "create_worktree",
+                  toolCallId: worktreeToolCallId,
+                  title: "Creating worktree",
+                  status: "completed",
+                  data: {
+                    branch: worktree.worktree.refName,
+                    worktreePath: targetWorktreePath,
+                  },
+                },
+                tone: "tool",
+              });
             }
 
             yield* runSetupProgram();
@@ -1586,6 +1641,41 @@ const makeWsRpcLayer = (
             {
               "rpc.aggregate": "server",
             },
+          ),
+        [WS_METHODS.serverCheckMcpServers]: (_input) =>
+          observeRpcEffect(
+            WS_METHODS.serverCheckMcpServers,
+            Effect.gen(function* () {
+              const configs = yield* serverSettings.getSettings.pipe(
+                Effect.map((settings) => settings.mcpServers.filter((server) => server.enabled)),
+              );
+              return yield* Effect.forEach(
+                configs,
+                (config) =>
+                  Effect.gen(function* () {
+                    const tools = yield* Effect.tryPromise({
+                      try: () => listExternalMcpTools(config),
+                      catch: () => "unavailable" as const,
+                    }).pipe(Effect.orElseSucceed(() => null));
+                    const checkedAt = DateTime.toEpochMillis(yield* DateTime.now);
+                    return tools === null
+                      ? {
+                          id: config.id,
+                          status: "offline" as const,
+                          checkedAt,
+                          toolCount: 0,
+                        }
+                      : {
+                          id: config.id,
+                          status: "online" as const,
+                          checkedAt,
+                          toolCount: Array.isArray(tools) ? tools.length : 0,
+                        };
+                  }),
+                { concurrency: 4 },
+              );
+            }),
+            { "rpc.aggregate": "server" },
           ),
         [WS_METHODS.memoryList]: (input) =>
           observeRpcEffect(WS_METHODS.memoryList, memoryStore.list(input), {

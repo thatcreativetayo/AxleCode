@@ -170,6 +170,62 @@ describe("makeAxleStreamDecoder", () => {
     expect(decoder.finish()).toEqual({ response: "Done" });
   });
 
+  it("keeps backgrounded tools open until a monitor collects them", () => {
+    const backgrounded: unknown[] = [];
+    const completed: unknown[] = [];
+    const decoder = makeAxleStreamDecoder({
+      onToolBackgrounded: (event) => backgrounded.push(event),
+      onToolCompleted: (event) => completed.push(event),
+    });
+
+    decoder.push(
+      '{"type":"tool.started","toolCallId":"call-bg","toolName":"bash","arguments":{}}\n' +
+        '{"type":"tool.backgrounded","toolCallId":"call-bg","toolName":"bash","jobId":"job-1"}\n',
+    );
+
+    expect(backgrounded).toEqual([{ toolCallId: "call-bg", toolName: "bash", jobId: "job-1" }]);
+    expect(decoder.hasOpenTools()).toBe(true);
+
+    decoder.push('{"type":"result","response":"Command started in the background."}\n');
+    expect(decoder.finish()).toEqual({ response: "Command started in the background." });
+    // A backgrounded tool is intentionally not failed just because the turn
+    // result arrived; a later monitor call still owns its completion.
+    expect(decoder.hasOpenTools()).toBe(true);
+    expect(completed).toEqual([]);
+  });
+
+  it("rejects a backgrounded frame for a tool that is not active", () => {
+    const decoder = makeAxleStreamDecoder();
+    decoder.push(
+      '{"type":"tool.backgrounded","toolCallId":"call-bg","toolName":"bash","jobId":"job-1"}\n',
+    );
+    expect(() => decoder.finish()).toThrow("backgrounded a tool that was not active");
+  });
+
+  it("surfaces turn-level error frames and fails open tool lifecycles", () => {
+    const errors: string[] = [];
+    const completed: unknown[] = [];
+    const decoder = makeAxleStreamDecoder({
+      onError: (message) => errors.push(message),
+      onToolCompleted: (event) => completed.push(event),
+    });
+    decoder.push(
+      '{"type":"tool.started","toolCallId":"call-err","toolName":"bash","arguments":{}}\n' +
+        '{"type":"error","message":"Provider connection lost.","sessionId":"session-1"}\n',
+    );
+
+    expect(errors).toEqual(["Provider connection lost."]);
+    expect(completed).toEqual([
+      {
+        toolCallId: "call-err",
+        toolName: "bash",
+        output: "Provider connection lost.",
+        isError: true,
+      },
+    ]);
+    expect(decoder.hasOpenTools()).toBe(false);
+  });
+
   it("flags timed-out tools and rejects non-numeric durations", () => {
     const completed: unknown[] = [];
     const decoder = makeAxleStreamDecoder({
@@ -338,6 +394,14 @@ describe("axleToolPresentation", () => {
       title: "Update plan",
     });
   });
+
+  it("renders bash_monitor as a command lifecycle", () => {
+    expect(axleToolPresentation("bash_monitor", { command_id: "job-1" })).toMatchObject({
+      itemType: "command_execution",
+      title: "Monitor command",
+      data: { kind: "execute", toolName: "bash_monitor" },
+    });
+  });
 });
 
 describe("makeAxleAssistantSegmenter", () => {
@@ -417,7 +481,7 @@ describe("Axle session continuity", () => {
     ).toContain("repaired the session history automatically");
     expect(
       formatAxleProcessError(
-        "agent_router API error (HTTP 400 Bad Request): {\"error\":{\"message\":\"Invalid schema for function 'ls': null is not of type \\\"array\\\"\"}}",
+        'agent_router API error (HTTP 400 Bad Request): {"error":{"message":"Invalid schema for function \'ls\': null is not of type \\"array\\""}}',
         "project",
       ),
     ).toContain("tool schemas");

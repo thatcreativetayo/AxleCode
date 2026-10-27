@@ -4,12 +4,83 @@ use crate::tool::{
 };
 use async_trait::async_trait;
 use serde_json::json;
-use std::sync::Arc;
-use std::time::Duration;
+use std::collections::HashMap;
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc,
+};
+use tokio::sync::{watch, Mutex};
+use tokio::time::{timeout, Duration};
 
-pub struct BashTool {
+const COMMAND_START_WAIT: Duration = Duration::from_secs(5);
+
+#[derive(Clone)]
+pub struct CommandMonitor {
+    jobs: Arc<Mutex<HashMap<String, watch::Receiver<Option<ToolExecutionResult>>>>>,
+    next_id: Arc<AtomicU64>,
     output_limit: usize,
     target: Arc<dyn ExecutionTarget>,
+}
+
+impl CommandMonitor {
+    pub fn with_target(output_limit: usize, target: Arc<dyn ExecutionTarget>) -> Self {
+        Self {
+            jobs: Arc::new(Mutex::new(HashMap::new())),
+            next_id: Arc::new(AtomicU64::new(1)),
+            output_limit,
+            target,
+        }
+    }
+
+    async fn start(&self, command: &str, cwd: &str, timeout_secs: u64) -> ToolExecutionResult {
+        let id = format!("cmd-{}", self.next_id.fetch_add(1, Ordering::Relaxed));
+        let (sender, receiver) = watch::channel(None);
+        self.jobs.lock().await.insert(id.clone(), receiver.clone());
+        let output_limit = self.output_limit;
+        let target = self.target.clone();
+        let command = command.to_string();
+        let cwd = cwd.to_string();
+        tokio::spawn(async move {
+            let result = run_command(&target, &command, &cwd, timeout_secs, output_limit).await;
+            sender.send_replace(Some(result));
+        });
+        let mut receiver = receiver;
+        if timeout(COMMAND_START_WAIT, receiver.changed())
+            .await
+            .is_ok()
+        {
+            let completed_result = { receiver.borrow().clone() };
+            if let Some(result) = completed_result {
+                self.jobs.lock().await.remove(&id);
+                return result;
+            }
+        }
+        ToolExecutionResult::success(format!(
+            "Command is still running. Monitor it with bash_monitor using command_id: {id}"
+        ))
+        .background_started(id)
+    }
+
+    async fn status(&self, id: &str) -> ToolExecutionResult {
+        let mut jobs = self.jobs.lock().await;
+        let Some(receiver) = jobs.get(id) else {
+            return ToolExecutionResult::error(format!(
+                "Unknown or already completed command_id: {id}"
+            ));
+        };
+        let result = receiver.borrow().clone();
+        match result {
+            Some(result) => {
+                jobs.remove(id);
+                result.background_completed(id.to_owned())
+            }
+            None => ToolExecutionResult::success(format!("Command {id} is still running.")),
+        }
+    }
+}
+
+pub struct BashTool {
+    monitor: CommandMonitor,
 }
 
 impl BashTool {
@@ -23,9 +94,14 @@ impl BashTool {
     /// boundary). The registry rebuilds `bash` when its target is swapped.
     pub fn with_target(output_limit: usize, target: Arc<dyn ExecutionTarget>) -> Self {
         Self {
-            output_limit,
-            target,
+            monitor: CommandMonitor::with_target(output_limit, target),
         }
+    }
+
+    /// Shared monitor used by [`BashMonitorTool`] so background commands can be
+    /// collected by later tool calls.
+    pub fn monitor(&self) -> CommandMonitor {
+        self.monitor.clone()
     }
 }
 
@@ -46,7 +122,7 @@ impl Tool for BashTool {
     }
 
     fn description(&self) -> &str {
-        "Execute shell commands in the terminal (PowerShell/cmd on Windows, sh/bash on Unix)."
+        "Run shell commands. Commands taking longer than five seconds continue in the background; use bash_monitor with the returned command_id to check completion."
     }
 
     fn parameters(&self) -> serde_json::Value {
@@ -93,53 +169,107 @@ impl Tool for BashTool {
             .and_then(|v| v.as_u64())
             .unwrap_or(300);
 
-        let request = ExecutionRequest::new(command_str, cwd, Duration::from_secs(timeout_secs));
-        let outcome = match self.target.execute(request).await {
-            Ok(outcome) => outcome,
-            Err(ExecutionError::Spawn { message }) => {
-                return Ok(ToolExecutionResult::error(format!(
-                    "Failed to spawn command ({}): {}",
-                    self.target.id(),
-                    message
-                )))
-            }
-            Err(other) => {
-                return Ok(ToolExecutionResult::error(format!(
-                    "Command execution error: {}",
-                    other
-                )))
-            }
+        Ok(self.monitor.start(command_str, cwd, timeout_secs).await)
+    }
+}
+
+pub struct BashMonitorTool {
+    monitor: CommandMonitor,
+}
+
+impl BashMonitorTool {
+    pub fn new(monitor: CommandMonitor) -> Self {
+        Self { monitor }
+    }
+}
+
+#[async_trait]
+impl Tool for BashMonitorTool {
+    fn name(&self) -> &str {
+        "bash_monitor"
+    }
+
+    fn label(&self) -> &str {
+        "Monitor Command"
+    }
+
+    fn description(&self) -> &str {
+        "Check whether a background bash command is still running and retrieve its output when it completes."
+    }
+
+    fn parameters(&self) -> serde_json::Value {
+        json!({
+            "type": "object",
+            "properties": {
+                "command_id": { "type": "string", "description": "ID returned by bash for a running command" }
+            },
+            "required": ["command_id"]
+        })
+    }
+
+    async fn execute(
+        &self,
+        args: serde_json::Value,
+        _cwd: &str,
+    ) -> anyhow::Result<ToolExecutionResult> {
+        let id = match args.get("command_id").and_then(|value| value.as_str()) {
+            Some(id) => id,
+            None => return Ok(ToolExecutionResult::error("Missing 'command_id' parameter")),
         };
+        Ok(self.monitor.status(id).await)
+    }
+}
 
-        let mut combined = String::new();
-        if !outcome.stdout.is_empty() {
-            combined.push_str(&outcome.stdout);
+async fn run_command(
+    target: &Arc<dyn ExecutionTarget>,
+    command_str: &str,
+    cwd: &str,
+    timeout_secs: u64,
+    output_limit: usize,
+) -> ToolExecutionResult {
+    let request = ExecutionRequest::new(command_str, cwd, Duration::from_secs(timeout_secs));
+    let outcome = match target.execute(request).await {
+        Ok(outcome) => outcome,
+        Err(ExecutionError::Spawn { message }) => {
+            return ToolExecutionResult::error(format!(
+                "Failed to spawn command ({}): {}",
+                target.id(),
+                message
+            ))
         }
-        if !outcome.stderr.is_empty() {
-            if !combined.is_empty() {
-                combined.push_str("\n--- STDERR ---\n");
-            }
-            combined.push_str(&outcome.stderr);
+        Err(other) => {
+            return ToolExecutionResult::error(format!("Command execution error: {}", other))
         }
-        combined = truncate_output(combined, self.output_limit);
+    };
 
-        if outcome.timed_out {
-            let mut message = format!("Command timed out after {} seconds", timeout_secs);
-            if !combined.is_empty() {
-                message.push_str(":\n");
-                message.push_str(&combined);
-            }
-            return Ok(ToolExecutionResult::timeout(message));
+    let mut combined = String::new();
+    if !outcome.stdout.is_empty() {
+        combined.push_str(&outcome.stdout);
+    }
+    if !outcome.stderr.is_empty() {
+        if !combined.is_empty() {
+            combined.push_str("\n--- STDERR ---\n");
         }
+        combined.push_str(&outcome.stderr);
+    }
+    combined = truncate_output(combined, output_limit);
 
-        if outcome.exit_code == Some(0) {
-            Ok(ToolExecutionResult::success(combined))
-        } else {
-            Ok(ToolExecutionResult::error(format!(
-                "Command failed with exit code {:?}:\n{}",
-                outcome.exit_code, combined
-            )))
+    if outcome.timed_out {
+        let mut message = format!("Command timed out after {} seconds", timeout_secs);
+        if !combined.is_empty() {
+            message.push_str(":\n");
+            message.push_str(&combined);
         }
+        return ToolExecutionResult::timeout(message);
+    }
+
+    if outcome.exit_code == Some(0) {
+        ToolExecutionResult::success(combined)
+    } else {
+        ToolExecutionResult::error(format!(
+            "Command failed with exit code {:?}:\n{}",
+            outcome.exit_code, combined
+        ))
     }
 }
 

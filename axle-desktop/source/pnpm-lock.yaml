@@ -391,6 +391,9 @@ importers:
       expo-widgets:
         specifier: ~56.0.19
         version: 56.0.19(3cdc0dde9f93166d952f1e1bd0cb25c0)
+      marked:
+        specifier: ^15.0.12
+        version: 15.0.12
       punycode:
         specifier: ^2.3.1
         version: 2.3.1
@@ -612,6 +615,9 @@ importers:
       effect:
         specifier: 4.0.0-beta.78
         version: 4.0.0-beta.78(patch_hash=c502bc684210b707dfceb87d8fe6ad6843395af6e19cfc02cd65854898bde2c5)
+      gsap:
+        specifier: 3.15.0
+        version: 3.15.0
       jose:
         specifier: 'catalog:'
         version: 6.2.2
@@ -7793,6 +7799,9 @@ packages:
   graphql@16.14.1:
     resolution: {integrity: sha512-cQOsSMS/IrDz82PVyRDvf/Q1F/bRbBVjJlh+xYOkI1qw2bWRvWGiWc+m2O0d6l4Bt1fyY+8kzJ8JFWGJqNeDBg==}
     engines: {node: ^12.22.0 || ^14.16.0 || ^16.0.0 || >=17.0.0}
+
+  gsap@3.15.0:
+    resolution: {integrity: sha512-dMW4CWBTUK1AEEDeZc1g4xpPGIrSf9fJF960qbTZmN/QwZIWY5wgliS6JWl9/25fpTGJrMRtSjGtOmPnfjZB+A==}
 
   h3@1.15.11:
     resolution: {integrity: sha512-L3THSe2MPeBwgIZVSH5zLdBBU90TOxarvhK9d04IDY2AmVS8j2Jz2LIWtwsGOU3lu2I5jCN7FNvVfY2+XyF+mg==}
@@ -19797,6 +19806,8 @@ snapshots:
   graceful-fs@4.2.11: {}
 
   graphql@16.14.1: {}
+
+  gsap@3.15.0: {}
 
   h3@1.15.11:
     dependencies:

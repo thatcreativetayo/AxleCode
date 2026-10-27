@@ -1,6 +1,7 @@
 import * as Schema from "effect/Schema";
 
 import { IsoDateTime, NonNegativeInt, PositiveInt, TrimmedNonEmptyString } from "./baseSchemas.ts";
+import { LocalModelPackId } from "./localModels.ts";
 import { ProviderInstanceId } from "./providerInstance.ts";
 
 const Identifier = TrimmedNonEmptyString.check(
@@ -168,6 +169,12 @@ export const CloudPlanFeatures = Schema.Struct({
   scheduledTasksMax: NonNegativeInt,
   pullRequestReviews: Schema.Boolean,
   teamSharing: Schema.Boolean,
+  /**
+   * Advisory gate for Axle Offline. The desktop still maps pack ids to plan
+   * tiers locally so an older account API cannot accidentally unlock a pack.
+   */
+  localModelsEnabled: Schema.optionalKey(Schema.Boolean),
+  localModelPacks: Schema.optionalKey(Schema.Array(LocalModelPackId)),
 });
 export type CloudPlanFeatures = typeof CloudPlanFeatures.Type;
 

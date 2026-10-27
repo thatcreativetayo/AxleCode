@@ -368,6 +368,10 @@ const resolvePrimaryStartConfig = Effect.fn("desktop.backendConfiguration.resolv
         ...backendChildEnvPatch(),
         ELECTRON_RUN_AS_NODE: "1",
         AXLE_CODEX_HOME: environment.path.join(environment.stateDir, "chatgpt-auth"),
+        // The backend is a Node child of Electron, so `process.resourcesPath`
+        // is not available there. Point it at the packaged resources root so
+        // Axle Offline can find the bundled llama-server.
+        AXLE_RESOURCES_DIR: environment.resourcesPath,
         AXLE_BINARY_PATH:
           configuredAxleBinaryPath ||
           (environment.isPackaged

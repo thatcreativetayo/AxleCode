@@ -4,10 +4,10 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { StyleProp, ViewStyle } from "react-native";
 import { BackHandler, Pressable, ScrollView, useColorScheme, View } from "react-native";
-import { useKeyboardState } from "react-native-keyboard-controller";
 import Animated, { FadeIn } from "react-native-reanimated";
 
 import { appBlurTargetRef } from "../lib/appBlurTarget";
+import { useKeyboardState } from "../lib/keyboard";
 import { useThemeColor } from "../lib/useThemeColor";
 import { cn } from "../lib/cn";
 import { type AppSymbolName, SymbolView } from "./AppSymbol";

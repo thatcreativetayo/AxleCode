@@ -11,6 +11,7 @@ import {
   serverEnvironmentHttpApiLayer,
   axleCodexAuthRouteLayer,
   axleCreditsRouteLayer,
+  axleLocalModelsRouteLayer,
   staticAndDevRouteLayer,
   browserApiCorsLayer,
 } from "./http.ts";
@@ -361,6 +362,7 @@ export const makeRoutesLayer = Layer.mergeAll(
     otlpTracesProxyRouteLayer,
     axleCodexAuthRouteLayer,
     axleCreditsRouteLayer,
+    axleLocalModelsRouteLayer,
     assetRouteLayer,
     staticAndDevRouteLayer,
     websocketRpcRouteLayer,

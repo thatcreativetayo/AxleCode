@@ -74,10 +74,10 @@ vi.mock("expo-widgets", () => ({
   addPushToStartTokenListener: vi.fn(() => ({ remove: vi.fn() })),
 }));
 
-vi.mock("../../widgets/AgentActivity", () => ({
-  default: {
+vi.mock("../../widgets/agentActivitySafe", () => ({
+  getAgentActivity: () => ({
     getInstances: widgetMocks.getInstances,
-  },
+  }),
 }));
 
 vi.mock("expo-notifications", () => ({

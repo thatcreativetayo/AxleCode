@@ -37,8 +37,17 @@ vi.mock("node:child_process", async (importOriginal) => {
 afterEach(() => vi.clearAllMocks());
 
 const decodeJson = Schema.decodeUnknownSync(Schema.UnknownFromJsonString);
-const readRecords = (path: string) =>
-  NodeFS.readFileSync(path, "utf8").trim().split("\n").map((line) => decodeJson(line));
+type RuntimeCall = {
+  readonly args: ReadonlyArray<string>;
+  readonly sessionId?: string;
+  readonly prompt?: string;
+  readonly interactionMode?: string;
+};
+const readRecords = (path: string): RuntimeCall[] =>
+  NodeFS.readFileSync(path, "utf8")
+    .trim()
+    .split("\n")
+    .map((line) => decodeJson(line) as RuntimeCall);
 const threadId = ThreadId.make("runtime-continuity");
 const instanceId = ProviderInstanceId.make("axle");
 
@@ -138,7 +147,9 @@ describe("Axle process lifecycle", () => {
           const session = (yield* adapter.listSessions())[0]!;
           expect(session.status).toBe("ready");
           expect(session.activeTurnId).toBeUndefined();
-          expect(vi.mocked(NodeChildProcess.spawn).mock.results[0]?.value.killed).toBe(true);
+          // The persistent runtime stays warm between turns. It is only
+          // stopped when the session is explicitly stopped.
+          expect(vi.mocked(NodeChildProcess.spawn).mock.results[0]?.value.killed).toBe(false);
           const assistantIndex = first.events.findIndex(
             (event) =>
               event.type === "item.completed" && event.payload.itemType === "assistant_message",
@@ -179,4 +190,72 @@ describe("Axle process lifecycle", () => {
         }),
     );
   }
+
+  it.live("reuses one persistent process across follow-up turns", () =>
+    Effect.gen(function* () {
+      const { cwd, adapter } = yield* makeHarness();
+      const subscription = yield* adapter.subscribeEvents!;
+      yield* adapter.sendTurn({ threadId, input: "Remember amber-orchid" });
+      const first = yield* untilCompleted(subscription);
+      expect(first.completed.payload.state).toBe("completed");
+
+      const child = vi.mocked(NodeChildProcess.spawn).mock.results[0]?.value;
+      expect(child?.killed).toBe(false);
+
+      yield* adapter.sendTurn({ threadId, input: "What was the earlier fact?" });
+      const second = yield* untilCompleted(subscription);
+      expect(second.completed.payload.state).toBe("completed");
+      expect(
+        second.events.some(
+          (event) =>
+            event.type === "item.completed" &&
+            event.payload.detail === "The earlier fact was amber-orchid.",
+        ),
+      ).toBe(true);
+      expect(NodeChildProcess.spawn).toHaveBeenCalledTimes(1);
+      expect(child?.killed).toBe(false);
+
+      const calls = readRecords(NodePath.join(cwd, "runtime-calls.jsonl"));
+      expect(calls).toHaveLength(2);
+      expect(calls[0]).toMatchObject({
+        args: expect.arrayContaining(["--persistent-json-stream"]),
+      });
+      expect(calls[0]?.args).not.toContain("--prompt-stdin");
+
+      yield* adapter.stopAll();
+      expect(child?.killed).toBe(true);
+    }),
+  );
+
+  it.live("restarts the persistent process when process arguments change", () =>
+    Effect.gen(function* () {
+      const { cwd, adapter } = yield* makeHarness();
+      const subscription = yield* adapter.subscribeEvents!;
+      yield* adapter.sendTurn({ threadId, input: "Remember amber-orchid" });
+      const first = yield* untilCompleted(subscription);
+      expect(first.completed.payload.state).toBe("completed");
+
+      const firstChild = vi.mocked(NodeChildProcess.spawn).mock.results[0]?.value;
+      yield* adapter.sendTurn({
+        threadId,
+        input: "What was the earlier fact?",
+        modelSelection: { instanceId, model: "openai/other-fixture" },
+      });
+      const second = yield* untilCompleted(subscription);
+      expect(second.completed.payload.state).toBe("completed");
+      expect(NodeChildProcess.spawn).toHaveBeenCalledTimes(2);
+      expect(firstChild?.killed).toBe(true);
+
+      const calls = readRecords(NodePath.join(cwd, "runtime-calls.jsonl"));
+      expect(calls).toHaveLength(2);
+      expect(calls[1]).toMatchObject({
+        args: expect.arrayContaining([
+          "--model",
+          "other-fixture",
+          "--session",
+          readAxleSessionBinding(cwd, String(threadId)),
+        ]),
+      });
+    }),
+  );
 });

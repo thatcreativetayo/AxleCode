@@ -5,7 +5,9 @@ import {
   AuthOrchestrationOperateScope,
   AuthOrchestrationReadScope,
   EnvironmentHttpApi,
+  LOCAL_MODEL_PACK_IDS,
   ProviderInstanceId,
+  type LocalModelPackId,
 } from "@axle/contracts";
 import { decodeOtlpTraceRecords } from "@axle/shared/observability";
 import * as Data from "effect/Data";
@@ -42,6 +44,7 @@ import {
 } from "./auth/http.ts";
 import * as ServerEnvironment from "./environment/ServerEnvironment.ts";
 import { browserApiCorsAllowedHeaders, browserApiCorsAllowedMethods } from "./httpCors.ts";
+import { localModelManager } from "./localModels/manager.ts";
 
 const OTLP_TRACES_PROXY_PATH = "/api/observability/v1/traces";
 const LOOPBACK_HOSTNAMES = new Set(["127.0.0.1", "::1", "localhost"]);
@@ -381,6 +384,153 @@ export const axleCreditsRouteLayer = Layer.mergeAll(
       const url = HttpServerRequest.toURL(request);
       const limit = axleUsageLimit(Option.isNone(url) ? null : url.value.searchParams.get("limit"));
       return yield* axleCreditsProxyResponse(`/usage?limit=${limit}`);
+    }),
+  ),
+);
+
+const AXLE_LOCAL_MODELS_ROUTE = "/api/axle/local-models";
+
+const localModelManagerFor = (config: {
+  readonly modelsDir: string;
+  readonly localModelsStatePath: string;
+}) =>
+  localModelManager({
+    modelsDir: config.modelsDir,
+    statePath: config.localModelsStatePath,
+  });
+
+const localModelJsonResponse = (body: unknown, status = 200) =>
+  HttpServerResponse.jsonUnsafe(body, { status });
+
+const localModelFailure = (cause: unknown, status = 500) =>
+  localModelJsonResponse(
+    {
+      error: cause instanceof Error ? cause.message : "The local model operation failed.",
+    },
+    status,
+  );
+
+type LocalModelAction = {
+  readonly packId: LocalModelPackId;
+  readonly sourcePath?: string;
+};
+
+class LocalModelOperationError extends Data.TaggedError("LocalModelOperationError")<{
+  readonly detail: string;
+  readonly cause?: unknown;
+}> {}
+
+const localModelOperationError = (cause: unknown) =>
+  new LocalModelOperationError({
+    detail: cause instanceof Error ? cause.message : "The local model operation failed.",
+    cause,
+  });
+
+const parseLocalModelAction = (body: unknown): LocalModelAction | undefined => {
+  if (typeof body !== "object" || body === null) return undefined;
+  const record = body as Record<string, unknown>;
+  const packId = record.packId;
+  if (typeof packId !== "string" || !LOCAL_MODEL_PACK_IDS.includes(packId as LocalModelPackId)) {
+    return undefined;
+  }
+  const sourcePath = typeof record.sourcePath === "string" ? record.sourcePath.trim() : "";
+  return {
+    packId: packId as LocalModelPackId,
+    ...(sourcePath.length > 0 ? { sourcePath } : {}),
+  };
+};
+
+const readLocalModelAction = (request: HttpServerRequest.HttpServerRequest) =>
+  Effect.gen(function* () {
+    const body = yield* request.json.pipe(Effect.orElseSucceed(() => undefined));
+    return parseLocalModelAction(body);
+  });
+
+/**
+ * Install/remove/run Axle Offline packs. Model bytes never pass through the
+ * renderer: the server downloads, verifies, and starts them. Launching the
+ * runtime is asynchronous so a multi-minute model load cannot hold an HTTP
+ * request open; the client polls GET `/api/axle/local-models`.
+ */
+export const axleLocalModelsRouteLayer = Layer.mergeAll(
+  HttpRouter.add(
+    "GET",
+    AXLE_LOCAL_MODELS_ROUTE,
+    Effect.gen(function* () {
+      yield* authenticateRawRouteWithScope(AuthOrchestrationReadScope);
+      const config = yield* ServerConfig.ServerConfig;
+      const snapshot = yield* Effect.promise(() => localModelManagerFor(config).snapshot());
+      return localModelJsonResponse(snapshot);
+    }),
+  ),
+  HttpRouter.add(
+    "POST",
+    `${AXLE_LOCAL_MODELS_ROUTE}/install`,
+    Effect.gen(function* () {
+      yield* authenticateRawRouteWithScope(AuthOrchestrationOperateScope);
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const action = yield* readLocalModelAction(request);
+      if (!action) return localModelFailure("A valid pack id is required.", 400);
+      const config = yield* ServerConfig.ServerConfig;
+      return yield* Effect.tryPromise({
+        try: () => localModelManagerFor(config).startInstall(action.packId, action.sourcePath),
+        catch: localModelOperationError,
+      }).pipe(
+        Effect.map((snapshot) => localModelJsonResponse(snapshot, 202)),
+        Effect.catch((cause) => Effect.succeed(localModelFailure(cause))),
+      );
+    }),
+  ),
+  HttpRouter.add(
+    "POST",
+    `${AXLE_LOCAL_MODELS_ROUTE}/remove`,
+    Effect.gen(function* () {
+      yield* authenticateRawRouteWithScope(AuthOrchestrationOperateScope);
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const action = yield* readLocalModelAction(request);
+      if (!action) return localModelFailure("A valid pack id is required.", 400);
+      const config = yield* ServerConfig.ServerConfig;
+      return yield* Effect.tryPromise({
+        try: () => localModelManagerFor(config).remove(action.packId),
+        catch: localModelOperationError,
+      }).pipe(
+        Effect.map((snapshot) => localModelJsonResponse(snapshot)),
+        Effect.catch((cause) => Effect.succeed(localModelFailure(cause))),
+      );
+    }),
+  ),
+  HttpRouter.add(
+    "POST",
+    `${AXLE_LOCAL_MODELS_ROUTE}/start`,
+    Effect.gen(function* () {
+      yield* authenticateRawRouteWithScope(AuthOrchestrationOperateScope);
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const action = yield* readLocalModelAction(request);
+      if (!action) return localModelFailure("A valid pack id is required.", 400);
+      const config = yield* ServerConfig.ServerConfig;
+      return yield* Effect.tryPromise({
+        try: () => localModelManagerFor(config).startRuntime(action.packId),
+        catch: localModelOperationError,
+      }).pipe(
+        Effect.map((snapshot) => localModelJsonResponse(snapshot, 202)),
+        Effect.catch((cause) => Effect.succeed(localModelFailure(cause))),
+      );
+    }),
+  ),
+  HttpRouter.add(
+    "POST",
+    `${AXLE_LOCAL_MODELS_ROUTE}/stop`,
+    Effect.gen(function* () {
+      yield* authenticateRawRouteWithScope(AuthOrchestrationOperateScope);
+      const config = yield* ServerConfig.ServerConfig;
+      return yield* Effect.tryPromise({
+        try: () => localModelManagerFor(config).stopRuntime(),
+        catch: localModelOperationError,
+      }).pipe(
+        Effect.flatMap(() => Effect.promise(() => localModelManagerFor(config).snapshot())),
+        Effect.map((snapshot) => localModelJsonResponse(snapshot)),
+        Effect.catch((cause) => Effect.succeed(localModelFailure(cause))),
+      );
     }),
   ),
 );

@@ -22,7 +22,7 @@ describe("pull request review progress", () => {
       report("reviewing", "Analyzing changed code for review findings…");
       await reviewGate;
       report("validating", "Checking findings against changed lines…");
-      report("success", "Review posted.");
+      report("success", "Review posted.", "The change is safe to merge.");
     });
 
     expect(task).not.toBeNull();
@@ -56,6 +56,7 @@ describe("pull request review progress", () => {
     expect(getPullRequestReviewProgressSnapshot().progressByKey.get(key)).toMatchObject({
       phase: "success",
       message: "Review posted.",
+      reviewSummary: "The change is safe to merge.",
     });
     expect(reviewNotifications).toBeGreaterThan(0);
     expect(returningNotifications).toBeGreaterThan(0);

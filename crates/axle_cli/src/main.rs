@@ -15,12 +15,13 @@ use axle_tools::{
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use clap::Parser;
 use futures::StreamExt;
+use serde::Deserialize;
 use std::env;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration as StdDuration;
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 use tracing_subscriber::EnvFilter;
 
 /// Axle's hosted gateway. The desktop app ships this base URL so every user
@@ -162,6 +163,14 @@ struct Cli {
 
     #[arg(long, help = "Write newline-delimited JSON token events to stdout")]
     json_stream: bool,
+
+    #[arg(
+        long,
+        hide = true,
+        requires = "json_stream",
+        help = "Keep a JSON-stream provider process alive for multiple turns"
+    )]
+    persistent_json_stream: bool,
 
     #[arg(
         long,
@@ -1003,6 +1012,89 @@ async fn run_prompt(
     result
 }
 
+#[derive(Deserialize)]
+struct PersistentTurnRequest {
+    prompt: String,
+    #[serde(default, rename = "imagePaths")]
+    image_paths: Vec<String>,
+    #[serde(default, rename = "imageMimeTypes")]
+    image_mime_types: Vec<String>,
+    #[serde(default, rename = "interactionMode")]
+    interaction_mode: Option<String>,
+}
+
+async fn run_persistent_json_stream(
+    cli: &Cli,
+    agent_loop: &mut AgentLoop,
+    session: &mut SessionManager,
+    memory_store: &Arc<tokio::sync::Mutex<MemoryStore>>,
+) -> anyhow::Result<()> {
+    let mut lines = BufReader::new(tokio::io::stdin()).lines();
+    while let Some(line) = lines.next_line().await? {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let request = match serde_json::from_str::<PersistentTurnRequest>(&line) {
+            Ok(request) => request,
+            Err(error) => {
+                write_json_line(serde_json::json!({
+                    "type": "error",
+                    "message": format!("Invalid persistent turn request: {error}"),
+                }));
+                continue;
+            }
+        };
+        if request.prompt.trim().is_empty() {
+            write_json_line(serde_json::json!({
+                "type": "error",
+                "message": "Prompt was empty",
+            }));
+            continue;
+        }
+        let interaction_mode = match request.interaction_mode.as_deref() {
+            Some("plan") => InteractionMode::Plan,
+            _ => InteractionMode::Build,
+        };
+        let memory_context = if cli.no_workspace_context {
+            None
+        } else {
+            let context = memory_store.lock().await.render_context(&request.prompt);
+            (!context.is_empty()).then_some(context)
+        };
+        agent_loop.set_turn_context(interaction_mode, memory_context);
+        let result = if request.prompt.trim().eq_ignore_ascii_case("/compact") {
+            agent_loop.compact_session(session).await.map(|compacted| {
+                if compacted {
+                    "Context compacted.".to_string()
+                } else {
+                    "Context was already compact.".to_string()
+                }
+            })
+        } else {
+            match load_image_parts(&request.image_paths, &request.image_mime_types).await {
+                Ok(images) => {
+                    run_prompt(agent_loop, session, &request.prompt, images, true, false).await
+                }
+                Err(error) => Err(error),
+            }
+        };
+        session.save().await?;
+        match result {
+            Ok(response) => write_result(cli, &response, session.session_id()),
+            Err(error) => {
+                tracing::error!("Persistent Axle turn failed: {error:#}");
+                write_json_line(serde_json::json!({
+                    "type": "error",
+                    "message": "Axle could not complete this turn. Check the server logs for details.",
+                    "sessionId": session.session_id(),
+                }));
+            }
+        }
+    }
+    session.save().await?;
+    Ok(())
+}
+
 async fn load_image_parts(
     paths: &[String],
     mime_types: &[String],
@@ -1466,6 +1558,16 @@ async fn main() -> anyhow::Result<()> {
                 "toolName": tool_name,
                 "arguments": arguments,
             })),
+            AxleEvent::ToolExecutionBackground {
+                tool_call_id,
+                tool_name,
+                job_id,
+            } if !is_hidden_control_tool(tool_name) => write_json_line(serde_json::json!({
+                "type": "tool.backgrounded",
+                "toolCallId": tool_call_id,
+                "toolName": tool_name,
+                "jobId": job_id,
+            })),
             AxleEvent::ToolExecutionEnd {
                 tool_call_id,
                 tool_name,
@@ -1616,6 +1718,26 @@ async fn main() -> anyhow::Result<()> {
     let context_window_tokens = parse_context_window_tokens(cli.context_window.as_deref())?
         .or(Some(DEFAULT_CONTEXT_WINDOW_TOKENS));
 
+    let loop_options = AgentLoopOptions {
+        cwd: cli.cwd.clone(),
+        workspace_context: !cli.no_workspace_context,
+        model_name: effective_model.clone(),
+        temperature: Some(0.7),
+        reasoning_effort: cli.effort.clone(),
+        append_system_prompt: effective_append_prompt.clone(),
+        context_window_tokens,
+        memory_context: None,
+        interaction_mode,
+        approval,
+    };
+
+    let mut agent_loop = AgentLoop::new(provider, tool_registry, event_bus, loop_options);
+
+    if cli.persistent_json_stream {
+        run_persistent_json_stream(&cli, &mut agent_loop, &mut session, &memory_store).await?;
+        return Ok(());
+    }
+
     const DEFAULT_PROMPT: &str = "Summarize your available tools and environment.";
     let prompt_from_stdin = if cli.prompt_stdin {
         let mut prompt = String::new();
@@ -1635,21 +1757,7 @@ async fn main() -> anyhow::Result<()> {
         let context = memory_store.lock().await.render_context(prompt);
         (!context.is_empty()).then_some(context)
     };
-
-    let loop_options = AgentLoopOptions {
-        cwd: cli.cwd.clone(),
-        workspace_context: !cli.no_workspace_context,
-        model_name: effective_model.clone(),
-        temperature: Some(0.7),
-        reasoning_effort: cli.effort.clone(),
-        append_system_prompt: effective_append_prompt.clone(),
-        context_window_tokens,
-        memory_context,
-        interaction_mode,
-        approval,
-    };
-
-    let agent_loop = AgentLoop::new(provider, tool_registry, event_bus, loop_options);
+    agent_loop.set_turn_context(interaction_mode, memory_context);
 
     let image_parts = load_image_parts(&cli.image_paths, &cli.image_mime_types).await?;
     if !cli.json && !cli.json_stream {

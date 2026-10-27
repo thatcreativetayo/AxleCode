@@ -27,6 +27,14 @@ pub struct ToolExecutionResult {
     /// True when execution stopped because a timeout limit was reached.
     #[serde(default)]
     pub timed_out: bool,
+    /// Set when the tool handed work to a background job and the agent should
+    /// keep the tool call open until a monitor collects it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub background_job_id: Option<String>,
+    /// Set by a monitor when it collected a previously backgrounded job. The
+    /// agent uses this to close the original tool call.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub completed_background_job_id: Option<String>,
 }
 
 impl ToolExecutionResult {
@@ -36,6 +44,8 @@ impl ToolExecutionResult {
             is_error: false,
             duration_ms: 0,
             timed_out: false,
+            background_job_id: None,
+            completed_background_job_id: None,
         }
     }
 
@@ -45,6 +55,8 @@ impl ToolExecutionResult {
             is_error: true,
             duration_ms: 0,
             timed_out: false,
+            background_job_id: None,
+            completed_background_job_id: None,
         }
     }
 
@@ -57,7 +69,19 @@ impl ToolExecutionResult {
             is_error: true,
             duration_ms: 0,
             timed_out: true,
+            background_job_id: None,
+            completed_background_job_id: None,
         }
+    }
+
+    pub fn background_started(mut self, job_id: impl Into<String>) -> Self {
+        self.background_job_id = Some(job_id.into());
+        self
+    }
+
+    pub fn background_completed(mut self, job_id: impl Into<String>) -> Self {
+        self.completed_background_job_id = Some(job_id.into());
+        self
     }
 
     /// Stamps the measured wall-clock duration. The registry calls this once

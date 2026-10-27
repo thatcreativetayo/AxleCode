@@ -1,15 +1,18 @@
 /**
- * Which Axle gateway models the signed-in plan may reach.
+ * Which Axle models the signed-in plan may reach.
  *
- * Enforcement lives in the gateway, which refuses paid models on a free plan;
- * this module only mirrors the catalog's `plan` flags so the picker can show
- * paid models as disabled instead of advertising them as selectable. Only a
- * positively resolved Free plan locks anything: signed-out sessions,
- * unconfigured deployments, and failed lookups leave the catalog untouched so
- * no one is ever locked out.
+ * Hosted Axle models are enforced by the gateway, which refuses paid models on
+ * a free plan; this module mirrors the catalog's `plan` flags so the picker can
+ * show them disabled. Hosted gating fails open when the plan cannot be
+ * resolved, because the gateway remains the authority.
+ *
+ * Axle Offline packs have no gateway in front of them. Their install and model
+ * entries therefore fail closed when the plan is unresolved, so an outage
+ * cannot hand out a paid feature.
  */
 
-import type { CloudEntitlements } from "@axle/contracts";
+import type { CloudEntitlements, LocalModelPackId, LocalModelPlanTier } from "@axle/contracts";
+import { LOCAL_MODEL_PACK_IDS, LOCAL_MODEL_PACK_MIN_PLAN } from "@axle/contracts";
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 
 import { fetchAxleModelRates, type AxleModelRate } from "../account/axleGateway";
@@ -18,8 +21,49 @@ import { resolvedEntitlements, useEntitlements } from "./useEntitlements";
 
 /** The server builds Axle picker slugs as `axle/<gateway model id>`. */
 const AXLE_SLUG_PREFIX = "axle/";
+/** Axle Offline packs use the custom-provider slug prefix. */
+const AXLE_LOCAL_SLUG_PREFIX = "axle-local/";
+
+const PLAN_RANK: Readonly<Record<LocalModelPlanTier, number>> = {
+  free: 0,
+  pro: 1,
+  "pro-plus": 2,
+  ultra: 3,
+};
+
+/**
+ * True when the resolved plan includes the pack. Axle Offline has no gateway
+ * to enforce this at request time, so the client fails closed when the plan is
+ * unresolved rather than granting a paid feature.
+ */
+export function localModelPackAllowed(
+  planTier: LocalModelPlanTier | null,
+  packId: LocalModelPackId,
+): boolean {
+  if (planTier === null) return false;
+  return PLAN_RANK[planTier] >= PLAN_RANK[LOCAL_MODEL_PACK_MIN_PLAN[packId]];
+}
 
 const EMPTY_SLUGS: ReadonlySet<string> = new Set();
+
+/**
+ * Axle Offline packs are a paid plan feature. Unlike hosted models, there is
+ * no gateway in front of them, so the picker needs to lock packs the plan does
+ * not include. An unresolved plan locks every pack rather than silently
+ * granting a paid feature.
+ */
+export function lockedAxleLocalModelSlugs(
+  entitlements: CloudEntitlements | null,
+): ReadonlySet<string> {
+  const planTier = planTierFromId(entitlements?.planId);
+  const locked = new Set<string>();
+  for (const packId of LOCAL_MODEL_PACK_IDS) {
+    if (!localModelPackAllowed(planTier, packId)) {
+      locked.add(`${AXLE_LOCAL_SLUG_PREFIX}${packId}`);
+    }
+  }
+  return locked;
+}
 
 /**
  * Slugs the picker must disable for this plan. Empty unless the plan
@@ -106,8 +150,11 @@ export function useAxleModelRates(): ReadonlyArray<AxleModelRate> | null {
 export function useLockedAxleModelSlugs(): ReadonlySet<string> {
   const entitlements = useEntitlements();
   const rates = useAxleModelRates();
-  return useMemo(
-    () => lockedAxleModelSlugs(resolvedEntitlements(entitlements), rates),
-    [entitlements, rates],
-  );
+  return useMemo(() => {
+    const resolved = resolvedEntitlements(entitlements);
+    const hosted = lockedAxleModelSlugs(resolved, rates);
+    const local = lockedAxleLocalModelSlugs(resolved);
+    if (local.size === 0) return hosted;
+    return new Set([...hosted, ...local]);
+  }, [entitlements, rates]);
 }

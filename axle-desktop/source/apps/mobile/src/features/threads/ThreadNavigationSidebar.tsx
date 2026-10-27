@@ -1,8 +1,4 @@
-import { isLiquidGlassSupported, LiquidGlassView } from "@callstack/liquid-glass";
-import type {
-  EnvironmentProject,
-  EnvironmentThreadShell,
-} from "@axle/client-runtime/state/shell";
+import type { EnvironmentProject, EnvironmentThreadShell } from "@axle/client-runtime/state/shell";
 import { LegendList } from "@legendapp/list/react-native";
 import type { MenuAction } from "@react-native-menu/menu";
 import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
@@ -17,6 +13,7 @@ import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { AppText as Text } from "../../components/AppText";
 import { ControlPillMenu } from "../../components/ControlPill";
 import { SymbolView } from "../../components/AppSymbol";
+import { isLiquidGlassSupported, LiquidGlassView } from "../../lib/liquidGlass";
 import { NATIVE_LIQUID_GLASS_SUPPORTED } from "../../native/native-glass";
 import { NativeStackScreenOptions } from "../../native/StackHeader";
 import { scopedProjectKey, scopedThreadKey } from "../../lib/scopedEntities";

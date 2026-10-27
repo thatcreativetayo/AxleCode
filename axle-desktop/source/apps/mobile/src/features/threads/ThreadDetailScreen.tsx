@@ -1,6 +1,5 @@
 import { type EnvironmentConnectionPhase } from "@axle/client-runtime/connection";
 import type { EnvironmentThreadStatus } from "@axle/client-runtime/state/threads";
-import { useKeyboardChatComposerInset, useKeyboardScrollToEnd } from "@legendapp/list/keyboard";
 import type { LegendListRef } from "@legendapp/list/react-native";
 import type {
   ApprovalRequestId,
@@ -18,7 +17,6 @@ import { formatElapsed } from "@axle/shared/orchestrationTiming";
 import * as Haptics from "expo-haptics";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Platform, View, type GestureResponderEvent } from "react-native";
-import { KeyboardController, KeyboardStickyView } from "react-native-keyboard-controller";
 import Animated, { FadeInDown, FadeOut, LinearTransition } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -26,6 +24,12 @@ import { AppText as Text } from "../../components/AppText";
 import type { ComposerEditorHandle } from "../../components/ComposerEditor";
 import type { StatusTone } from "../../components/StatusPill";
 import type { DraftComposerImageAttachment } from "../../lib/composerImages";
+import {
+  KeyboardController,
+  KeyboardStickyView,
+  useKeyboardChatComposerInset,
+  useKeyboardScrollToEnd,
+} from "../../lib/keyboard";
 import { CHAT_CONTENT_MAX_WIDTH, type LayoutVariant } from "../../lib/layout";
 import { scopedThreadKey } from "../../lib/scopedEntities";
 import { NATIVE_LIQUID_GLASS_SUPPORTED } from "../../native/native-glass";

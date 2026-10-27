@@ -3,6 +3,7 @@ export * from "./auth.ts";
 export * from "./environment.ts";
 export * from "./cloudJobs.ts";
 export * from "./cloudSchedules.ts";
+export * from "./localModels.ts";
 export * from "./environmentHttp.ts";
 export * from "./relayClient.ts";
 export * from "./desktopBootstrap.ts";

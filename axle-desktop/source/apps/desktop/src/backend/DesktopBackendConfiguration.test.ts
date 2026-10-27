@@ -139,6 +139,7 @@ describe("DesktopBackendConfiguration", () => {
           first.env.AXLE_CODEX_HOME,
           environment.path.join(environment.stateDir, "chatgpt-auth"),
         );
+        assert.equal(first.env.AXLE_RESOURCES_DIR, environment.resourcesPath);
         assert.equal(
           first.env.AXLE_BINARY_PATH,
           environment.path.join(environment.resourcesPath, "axle", "axle"),
@@ -482,10 +483,7 @@ describe("DesktopBackendConfiguration", () => {
           assert.equal(config.httpBaseUrl.href, "http://172.27.0.99:5050/");
           assert.equal(config.env.OPENAI_API_KEY, "openai-key");
           assert.equal(config.env.ANTHROPIC_API_KEY, "anthropic-key");
-          assert.equal(
-            config.env.AXLE_CODEX_HOME,
-            "/mnt/c/axle/chatgpt-auth",
-          );
+          assert.equal(config.env.AXLE_CODEX_HOME, "/mnt/c/axle/chatgpt-auth");
           // The existing WSLENV is preserved byte-for-byte (note the empty
           // "::" segment survives — WSL ignores it, so we don't normalize
           // it away) and the remaining supported API keys are appended. OPENAI_API_KEY is

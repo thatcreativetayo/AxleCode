@@ -550,7 +550,10 @@ it.layer(NodeServices.layer)("server settings", (it) => {
       });
 
       const published = yield* PubSub.take(changes);
-      assert.equal(published.providerInstances[instanceId]?.environment?.[0]?.value, "openai-secret");
+      assert.equal(
+        published.providerInstances[instanceId]?.environment?.[0]?.value,
+        "openai-secret",
+      );
     }).pipe(Effect.provide(makeServerSettingsLayer())),
   );
   it.effect("stores sensitive provider instance environment values outside settings.json", () =>
@@ -615,5 +618,59 @@ it.layer(NodeServices.layer)("server settings", (it) => {
         "sk-or-secret",
       );
     }).pipe(Effect.provide(makeServerSettingsLayer())),
+  );
+
+  it.effect(
+    "stores MCP authorization tokens outside settings.json and preserves redacted tokens",
+    () =>
+      Effect.gen(function* () {
+        const serverSettings = yield* ServerSettingsModule.ServerSettingsService;
+        const serverConfig = yield* ServerConfig.ServerConfig;
+        const fileSystem = yield* FileSystem.FileSystem;
+        const server = {
+          id: "mcp-personal",
+          name: "Personal MCP",
+          url: "https://mcp.example.test/rpc",
+          authorizationToken: "mcp-secret",
+          enabled: true,
+        };
+
+        const next = yield* serverSettings.updateSettings({ mcpServers: [server] });
+        assert.equal(next.mcpServers[0]?.authorizationToken, "mcp-secret");
+        assert.equal(next.mcpServers[0]?.authorizationTokenRedacted, true);
+
+        const raw = yield* fileSystem.readFileString(serverConfig.settingsPath);
+        assert.notInclude(raw, "mcp-secret");
+        // @effect-diagnostics-next-line preferSchemaOverJson:off
+        assert.deepEqual(JSON.parse(raw).mcpServers, [
+          {
+            id: "mcp-personal",
+            name: "Personal MCP",
+            url: "https://mcp.example.test/rpc",
+            authorizationToken: "",
+            authorizationTokenRedacted: true,
+            enabled: true,
+          },
+        ]);
+
+        const materialized = yield* serverSettings.getSettings;
+        assert.equal(materialized.mcpServers[0]?.authorizationToken, "mcp-secret");
+
+        yield* serverSettings.updateSettings({
+          mcpServers: [
+            {
+              ...server,
+              authorizationToken: "",
+              authorizationTokenRedacted: true,
+            },
+          ],
+        });
+        const preserved = yield* serverSettings.getSettings;
+        assert.equal(preserved.mcpServers[0]?.authorizationToken, "mcp-secret");
+
+        const redacted = ServerSettingsModule.redactServerSettingsForClient(preserved);
+        assert.equal(redacted.mcpServers[0]?.authorizationToken, "");
+        assert.equal(redacted.mcpServers[0]?.authorizationTokenRedacted, true);
+      }).pipe(Effect.provide(makeServerSettingsLayer())),
   );
 });

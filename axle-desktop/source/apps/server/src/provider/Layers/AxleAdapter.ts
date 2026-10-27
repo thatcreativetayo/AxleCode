@@ -3,6 +3,7 @@ import * as NodeChildProcess from "node:child_process";
 import * as NodeCrypto from "node:crypto";
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
+import type { Readable, Writable } from "node:stream";
 
 import {
   EventId,
@@ -22,6 +23,8 @@ import {
   type ProviderSession,
   type RuntimeMode,
   type ProviderWorkspaceContext,
+  LOCAL_MODEL_PACK_IDS,
+  type LocalModelPackId,
 } from "@axle/contracts";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -46,6 +49,7 @@ import {
   type ProviderAdapterError,
 } from "../Errors.ts";
 import * as McpProviderSession from "../../mcp/McpProviderSession.ts";
+import { localModelManager } from "../../localModels/manager.ts";
 import { currentAuthSessionId } from "../ProviderExecutionContext.ts";
 import type { ProviderAdapterShape, ProviderThreadSnapshot } from "../Services/ProviderAdapter.ts";
 import type { EventNdjsonLogger } from "./EventNdjsonLogger.ts";
@@ -67,6 +71,9 @@ export interface AxleAdapterOptions {
   readonly binaryPath: string;
   readonly attachmentsDir: string;
   readonly environment: NodeJS.ProcessEnv;
+  /** Where Axle Offline model packs are installed, if local models are enabled. */
+  readonly localModelsDir?: string | undefined;
+  readonly localModelsStatePath?: string | undefined;
   readonly nativeEventLogger?: EventNdjsonLogger | undefined;
   readonly getCustomInstructions?: (() => Effect.Effect<string>) | undefined;
 }
@@ -91,6 +98,12 @@ export interface AxleToolCompletedEvent {
   readonly durationMs?: number | undefined;
   /** True when the runtime stopped the tool because it hit a timeout limit. */
   readonly timedOut?: boolean | undefined;
+}
+
+export interface AxleToolBackgroundedEvent {
+  readonly toolCallId: string;
+  readonly toolName: string;
+  readonly jobId: string;
 }
 
 export interface AxleUsageEvent {
@@ -120,7 +133,10 @@ export interface AxleStreamCallbacks {
   readonly onDelta?: ((delta: string) => void) | undefined;
   readonly onSessionId?: ((sessionId: string) => void) | undefined;
   readonly onToolStarted?: ((event: AxleToolStartedEvent) => void) | undefined;
+  readonly onToolBackgrounded?: ((event: AxleToolBackgroundedEvent) => void) | undefined;
   readonly onToolCompleted?: ((event: AxleToolCompletedEvent) => void) | undefined;
+  /** A turn-level error frame from a persistent CLI process. */
+  readonly onError?: ((message: string) => void) | undefined;
   readonly onUsage?: ((event: AxleUsageEvent) => void) | undefined;
   readonly onApprovalRequested?: ((event: AxleApprovalRequestedEvent) => void) | undefined;
   readonly onApprovalResolved?: ((event: AxleApprovalResolvedEvent) => void) | undefined;
@@ -174,7 +190,11 @@ export function formatAxleProcessError(
   if (/429|rate limit|too many requests/iu.test(detail)) {
     return "The provider is rate-limiting requests. Axle retried automatically; wait a few seconds and send the message again.";
   }
-  if (/http 5\d\d|internal server error|bad gateway|service unavailable|gateway timeout/iu.test(detail)) {
+  if (
+    /http 5\d\d|internal server error|bad gateway|service unavailable|gateway timeout/iu.test(
+      detail,
+    )
+  ) {
     return "The provider had a temporary server error and Axle's automatic retries were exhausted. Try again in a few seconds.";
   }
   return detail;
@@ -208,19 +228,36 @@ interface SessionState {
 }
 
 type AxleChildProcess = ReturnType<typeof NodeChildProcess.spawn>;
+type AxlePipedChildProcess = NodeChildProcess.ChildProcessByStdio<Writable, Readable, Readable>;
+
+interface PendingPersistentTurn {
+  readonly decoder: ReturnType<typeof makeAxleStreamDecoder>;
+  readonly resolve: (result: AxleProcessResult) => void;
+  readonly reject: (cause: unknown) => void;
+  readonly childKey: string;
+  fail?: ((cause: unknown) => void) | undefined;
+}
+
+interface PersistentAxleProcess {
+  readonly child: AxlePipedChildProcess;
+  readonly signature: string;
+  stderr: string;
+  pending?: PendingPersistentTurn | undefined;
+}
 
 export function makeAxleStreamDecoder(callbacks: AxleStreamCallbacks = {}) {
   let stdoutBuffer = "";
   let result: AxleProcessResult | undefined;
   let protocolError: Error | undefined;
   const activeTools = new Map<string, { readonly toolName: string }>();
+  const backgroundTools = new Map<string, { readonly toolName: string; readonly jobId: string }>();
   const pendingApprovals = new Map<
     string,
     { readonly toolCallId: string; readonly toolName: string }
   >();
 
   const failOpenTools = (reason: string) => {
-    for (const [toolCallId, tool] of activeTools) {
+    for (const [toolCallId, tool] of [...activeTools, ...backgroundTools]) {
       callbacks.onToolCompleted?.({
         toolCallId,
         toolName: tool.toolName,
@@ -229,6 +266,7 @@ export function makeAxleStreamDecoder(callbacks: AxleStreamCallbacks = {}) {
       });
     }
     activeTools.clear();
+    backgroundTools.clear();
   };
 
   const failOpenApprovals = (reason: string) => {
@@ -257,9 +295,11 @@ export function makeAxleStreamDecoder(callbacks: AxleStreamCallbacks = {}) {
         type?: unknown;
         delta?: unknown;
         response?: unknown;
+        message?: unknown;
         sessionId?: unknown;
         toolCallId?: unknown;
         toolName?: unknown;
+        jobId?: unknown;
         arguments?: unknown;
         output?: unknown;
         isError?: unknown;
@@ -312,6 +352,32 @@ export function makeAxleStreamDecoder(callbacks: AxleStreamCallbacks = {}) {
         });
         return;
       }
+      if (event.type === "tool.backgrounded") {
+        if (
+          typeof event.toolCallId !== "string" ||
+          typeof event.toolName !== "string" ||
+          typeof event.jobId !== "string"
+        ) {
+          setProtocolError("Axle returned a malformed tool.backgrounded event.");
+          return;
+        }
+        const activeTool = activeTools.get(event.toolCallId);
+        if (!activeTool || activeTool.toolName !== event.toolName) {
+          setProtocolError("Axle backgrounded a tool that was not active.");
+          return;
+        }
+        activeTools.delete(event.toolCallId);
+        backgroundTools.set(event.toolCallId, {
+          toolName: event.toolName,
+          jobId: event.jobId,
+        });
+        callbacks.onToolBackgrounded?.({
+          toolCallId: event.toolCallId,
+          toolName: event.toolName,
+          jobId: event.jobId,
+        });
+        return;
+      }
       if (event.type === "usage") {
         if (
           typeof event.promptTokens !== "number" ||
@@ -343,6 +409,7 @@ export function makeAxleStreamDecoder(callbacks: AxleStreamCallbacks = {}) {
           return;
         }
         activeTools.delete(event.toolCallId);
+        backgroundTools.delete(event.toolCallId);
         callbacks.onToolCompleted?.({
           toolCallId: event.toolCallId,
           toolName: event.toolName,
@@ -351,6 +418,16 @@ export function makeAxleStreamDecoder(callbacks: AxleStreamCallbacks = {}) {
           ...(typeof event.durationMs === "number" ? { durationMs: event.durationMs } : {}),
           ...(typeof event.timedOut === "boolean" ? { timedOut: event.timedOut } : {}),
         });
+        return;
+      }
+      if (event.type === "error") {
+        if (typeof event.message !== "string") {
+          setProtocolError("Axle returned a malformed error event.");
+          return;
+        }
+        if (typeof event.sessionId === "string") callbacks.onSessionId?.(event.sessionId);
+        failOpenTools(event.message);
+        callbacks.onError?.(event.message);
         return;
       }
       if (event.type === "approval.requested") {
@@ -417,7 +494,7 @@ export function makeAxleStreamDecoder(callbacks: AxleStreamCallbacks = {}) {
 
   return {
     hasOpenTools(): boolean {
-      return activeTools.size > 0;
+      return activeTools.size > 0 || backgroundTools.size > 0;
     },
     hasPendingApprovals(): boolean {
       return pendingApprovals.size > 0;
@@ -546,7 +623,7 @@ export function axleToolPresentation(
   const isBrowserTool = normalizedName.startsWith("preview_");
   const isMcpTool = isBrowserTool || normalizedName === "getpullrequestcomments";
   const itemType: ToolLifecycleItemType =
-    normalizedName === "bash"
+    normalizedName === "bash" || normalizedName === "bash_monitor"
       ? "command_execution"
       : normalizedName === "write" || normalizedName === "edit"
         ? "file_change"
@@ -556,7 +633,7 @@ export function axleToolPresentation(
             ? "mcp_tool_call"
             : "dynamic_tool_call";
   const kind =
-    normalizedName === "bash"
+    normalizedName === "bash" || normalizedName === "bash_monitor"
       ? "execute"
       : normalizedName === "grep" || normalizedName === "find"
         ? "search"
@@ -564,6 +641,7 @@ export function axleToolPresentation(
   const titleByName: Record<string, string> = {
     ask_user: "Ask user",
     bash: "Terminal",
+    bash_monitor: "Monitor command",
     edit: "Edit file",
     find: "Find",
     grep: "Grep",
@@ -927,6 +1005,7 @@ export function makeAxleProcessArgs(input: {
   readonly mcpUrl?: string | undefined;
   readonly mcpBearerTokenEnvVar?: string | undefined;
   readonly approvalFile?: string | undefined;
+  readonly persistentJsonStream?: boolean | undefined;
 }): string[] {
   const selection = parseAxleModelSelection(input.model);
   const args = [
@@ -937,7 +1016,7 @@ export function makeAxleProcessArgs(input: {
     selection.model,
     "--cwd",
     input.cwd,
-    "--prompt-stdin",
+    ...(input.persistentJsonStream ? ["--persistent-json-stream"] : ["--prompt-stdin"]),
   ];
   if (selection.baseUrl) {
     args.push("--base-url", selection.baseUrl);
@@ -967,8 +1046,10 @@ export function makeAxleProcessArgs(input: {
     // begins instead of silently changing the requested permission boundary.
     args.push("--runtime-mode", input.runtimeMode);
   }
-  for (const image of input.images ?? []) {
-    args.push("--image-path", image.path, "--image-mime-type", image.mimeType);
+  if (!input.persistentJsonStream) {
+    for (const image of input.images ?? []) {
+      args.push("--image-path", image.path, "--image-mime-type", image.mimeType);
+    }
   }
   if (input.customInstructions?.trim()) {
     args.push("--append-system-prompt", input.customInstructions.trim());
@@ -1147,12 +1228,225 @@ function runAxle(input: {
   });
 }
 
+function runPersistentAxle(input: {
+  readonly binaryPath: string;
+  readonly cwd: string;
+  readonly prompt: string;
+  readonly model: string;
+  readonly images?: ReadonlyArray<{ readonly path: string; readonly mimeType: string }>;
+  readonly reasoningEffort?: string | undefined;
+  readonly contextWindow?: string | undefined;
+  readonly interactionMode?: ProviderInteractionMode | undefined;
+  readonly runtimeMode?: RuntimeMode | undefined;
+  readonly environment: NodeJS.ProcessEnv;
+  readonly activeChildren: Map<string, AxleChildProcess>;
+  readonly childKey: string;
+  readonly isCancelled: () => boolean;
+  readonly callbacks?: AxleStreamCallbacks | undefined;
+  readonly sessionId?: string | undefined;
+  readonly workspaceContext?: ProviderWorkspaceContext | undefined;
+  readonly customInstructions?: string | undefined;
+  readonly mcpUrl?: string | undefined;
+  readonly mcpBearerTokenEnvVar?: string | undefined;
+  readonly approvalFile?: string | undefined;
+  readonly processes: Map<string, PersistentAxleProcess>;
+  readonly processKey: string;
+}) {
+  return Effect.tryPromise({
+    try: () =>
+      new Promise<AxleProcessResult>((resolve, reject) => {
+        if (input.isCancelled()) {
+          reject(new Error("Axle turn interrupted."));
+          return;
+        }
+        const args = makeAxleProcessArgs({ ...input, persistentJsonStream: true });
+        const signatureArgs = args.filter(
+          (argument, index) => argument !== "--session" && args[index - 1] !== "--session",
+        );
+        const signature = NodeCrypto.createHash("sha256")
+          .update(JSON.stringify(signatureArgs))
+          .update(JSON.stringify(input.environment))
+          .digest("hex");
+        let processState = input.processes.get(input.processKey);
+        if (
+          processState &&
+          (processState.signature !== signature || processState.child.exitCode !== null)
+        ) {
+          input.processes.delete(input.processKey);
+          processState.child.kill();
+          processState = undefined;
+        }
+        let createdProcess = false;
+        if (!processState) {
+          const child = NodeChildProcess.spawn(input.binaryPath, args, {
+            cwd: input.cwd,
+            env: input.environment,
+            windowsHide: true,
+            shell: false,
+            stdio: ["pipe", "pipe", "pipe"],
+          });
+          processState = { child, signature, stderr: "" };
+          input.processes.set(input.processKey, processState);
+          createdProcess = true;
+        }
+        const currentProcess = processState;
+        const child = currentProcess.child;
+        let settled = false;
+        let idleTimeout: ReturnType<typeof setTimeout> | undefined;
+        currentProcess.stderr = "";
+        const appendStderr = (chunk: string) => {
+          const next = currentProcess.stderr + chunk;
+          currentProcess.stderr = next.length > 65_536 ? next.slice(-65_536) : next;
+        };
+        const removeActiveChild = () => {
+          if (input.activeChildren.get(input.childKey) === child) {
+            input.activeChildren.delete(input.childKey);
+          }
+        };
+        const clearIdleTimeout = () => {
+          if (idleTimeout !== undefined) {
+            clearTimeout(idleTimeout);
+            idleTimeout = undefined;
+          }
+        };
+        const clearPending = () => {
+          currentProcess.pending = undefined;
+          clearIdleTimeout();
+          removeActiveChild();
+        };
+        const settle = (result?: AxleProcessResult, cause?: unknown) => {
+          if (settled) return;
+          settled = true;
+          clearPending();
+          if (cause !== undefined) reject(cause);
+          else if (result !== undefined) resolve(result);
+          else reject(new Error("Axle persistent turn ended without a result."));
+        };
+        const destroyProcess = () => {
+          if (input.processes.get(input.processKey) === currentProcess) {
+            input.processes.delete(input.processKey);
+          }
+          clearIdleTimeout();
+          child.kill();
+        };
+        const decoder = makeAxleStreamDecoder({
+          ...input.callbacks,
+          onResult: () => {
+            try {
+              settle(decoder.finish());
+            } catch (cause) {
+              settle(undefined, cause);
+              destroyProcess();
+            }
+          },
+          onError: (message) => {
+            input.callbacks?.onError?.(message);
+            settle(undefined, new Error(message));
+            // A failed turn may have mutated in-memory session state. Discard
+            // this process so a retry reloads the durable transcript instead.
+            destroyProcess();
+          },
+        });
+        const armIdleTimeout = () => {
+          if (settled) return;
+          clearIdleTimeout();
+          // An open tool or approval is positive activity even when the
+          // provider pipe is quiet. Backgrounded tools remain open until a
+          // monitor collects them, matching the runtime's lifecycle.
+          if (decoder.hasOpenTools() || decoder.hasPendingApprovals()) return;
+          idleTimeout = setTimeout(() => {
+            const message = `Axle turn stalled after ${AXLE_TURN_IDLE_TIMEOUT_MS}ms without provider activity.`;
+            appendStderr(`\n${message}`);
+            decoder.failOpenWork(message);
+            child.kill("SIGKILL");
+            settle(undefined, new Error(message));
+          }, AXLE_TURN_IDLE_TIMEOUT_MS);
+        };
+        const pending: PendingPersistentTurn = {
+          decoder,
+          resolve,
+          reject,
+          childKey: input.childKey,
+        };
+        currentProcess.pending = pending;
+        input.activeChildren.set(input.childKey, child);
+        pending.fail = (cause) => settle(undefined, cause);
+        if (createdProcess) {
+          child.stdout.setEncoding("utf8");
+          child.stderr.setEncoding("utf8");
+          child.stdout.on("data", (chunk: string) => {
+            const activeTurn = currentProcess.pending;
+            if (!activeTurn) return;
+            activeTurn.decoder.push(chunk);
+            if (chunk.length > 0) armIdleTimeout();
+          });
+          child.stderr.on("data", (chunk: string) => {
+            const activeTurn = currentProcess.pending;
+            appendStderr(chunk);
+            if (activeTurn && chunk.length > 0) armIdleTimeout();
+          });
+          child.stdin.on("error", (error) => {
+            const activeTurn = currentProcess.pending;
+            if (!activeTurn) return;
+            activeTurn.fail?.(new Error(`Unable to send the prompt to Axle: ${error.message}`));
+            destroyProcess();
+          });
+          child.once("error", (error) => {
+            const activeTurn = currentProcess.pending;
+            if (!activeTurn) return;
+            activeTurn.decoder.failOpenWork(`Axle process error: ${error.message}`);
+            activeTurn.fail?.(error);
+            destroyProcess();
+          });
+          child.once("close", (code) => {
+            if (input.processes.get(input.processKey) === currentProcess) {
+              input.processes.delete(input.processKey);
+            }
+            const activeTurn = currentProcess.pending;
+            if (!activeTurn) return;
+            const detail =
+              currentProcess.stderr.trim() || `Axle exited (exit code ${code ?? "unknown"}).`;
+            activeTurn.decoder.failOpenWork(detail);
+            activeTurn.fail?.(new Error(detail));
+          });
+        }
+        try {
+          child.stdin.write(
+            `${JSON.stringify({
+              prompt: input.prompt,
+              imagePaths: (input.images ?? []).map((image) => image.path),
+              imageMimeTypes: (input.images ?? []).map((image) => image.mimeType),
+              interactionMode: input.interactionMode === "plan" ? "plan" : "build",
+            })}\n`,
+            "utf8",
+          );
+        } catch (cause) {
+          settle(undefined, cause);
+          destroyProcess();
+        }
+        armIdleTimeout();
+        if (input.isCancelled()) {
+          settle(undefined, new Error("Axle turn interrupted."));
+          destroyProcess();
+        }
+      }),
+    catch: (cause) =>
+      new ProviderAdapterProcessError({
+        provider: PROVIDER,
+        threadId: "standalone",
+        detail: formatAxleProcessError(cause, input.workspaceContext),
+        cause,
+      }),
+  });
+}
+
 export const makeAxleAdapter = (options: AxleAdapterOptions) =>
   Effect.gen(function* () {
     const adapterScope = yield* Scope.Scope;
     const runtimeEvents = yield* PubSub.unbounded<ProviderRuntimeEvent>();
     const sessions = new Map<ThreadId, SessionState>();
     const activeChildren = new Map<string, AxleChildProcess>();
+    const persistentProcesses = new Map<string, PersistentAxleProcess>();
     const activeFibers = new Map<string, Fiber.Fiber<void>>();
     const cancelledTurnKeys = new Set<string>();
     const pendingApprovals = new Map<
@@ -1310,6 +1604,48 @@ export const makeAxleAdapter = (options: AxleAdapterOptions) =>
           authSessionId ?? undefined,
         );
         const activeMcp = workspaceContext === "none" ? undefined : mcpSession;
+        const localPackId = (() => {
+          const selection = parseAxleModelSelection(model);
+          return selection.provider === "axle-local" &&
+            LOCAL_MODEL_PACK_IDS.includes(selection.model as LocalModelPackId)
+            ? (selection.model as LocalModelPackId)
+            : undefined;
+        })();
+        const turnEnvironment = yield* Effect.gen(function* () {
+          if (!localPackId) return options.environment;
+          const localModelsDir = options.localModelsDir;
+          const localModelsStatePath = options.localModelsStatePath;
+          if (!localModelsDir || !localModelsStatePath) {
+            return yield* new ProviderAdapterRequestError({
+              provider: PROVIDER,
+              method: "thread.turn.start",
+              detail: "Axle Offline is not configured for this server.",
+            });
+          }
+          const runtime = yield* Effect.tryPromise({
+            try: () =>
+              localModelManager({
+                modelsDir: localModelsDir,
+                statePath: localModelsStatePath,
+              }).ensureRuntime(localPackId),
+            catch: (cause) =>
+              new ProviderAdapterRequestError({
+                provider: PROVIDER,
+                method: "thread.turn.start",
+                detail:
+                  cause instanceof Error
+                    ? cause.message
+                    : "The Axle Offline runtime could not be started.",
+                cause,
+              }),
+          });
+          return {
+            ...options.environment,
+            AXLE_LOCAL_BASE_URL: runtime.baseUrl,
+            AXLE_LOCAL_API_KEY: runtime.apiKey || "axle-local",
+            AXLE_LOCAL_MODELS_STATE_PATH: localModelsStatePath,
+          };
+        });
         const effectiveInstructions = [
           customInstructions.trim(),
           ...(activeMcp
@@ -1356,7 +1692,7 @@ export const makeAxleAdapter = (options: AxleAdapterOptions) =>
               hasSession: sessionId !== undefined,
               hasMcpSession: activeMcp !== undefined,
             });
-            const result = yield* runAxle({
+            const result = yield* runPersistentAxle({
               binaryPath: options.binaryPath,
               cwd,
               prompt,
@@ -1371,16 +1707,18 @@ export const makeAxleAdapter = (options: AxleAdapterOptions) =>
               environment: axleChildEnvironment(
                 activeMcp
                   ? {
-                      ...options.environment,
+                      ...turnEnvironment,
                       [T3_MCP_BEARER_TOKEN_ENV_VAR]: activeMcp.authorizationHeader.replace(
                         /^Bearer\s+/u,
                         "",
                       ),
                     }
-                  : options.environment,
+                  : turnEnvironment,
               ),
               activeChildren,
               childKey,
+              processes: persistentProcesses,
+              processKey: String(threadId),
               sessionId,
               customInstructions: effectiveInstructions,
               isCancelled: isTurnCancelled,
@@ -1965,6 +2303,11 @@ export const makeAxleAdapter = (options: AxleAdapterOptions) =>
             const fiber = activeFibers.get(key);
             if (fiber) yield* Fiber.interrupt(fiber);
           }
+          const persistent = persistentProcesses.get(String(threadId));
+          if (persistent) {
+            persistentProcesses.delete(String(threadId));
+            persistent.child.kill();
+          }
           sessions.delete(threadId);
         }),
       listSessions: () => Effect.sync(() => [...sessions.values()].map((state) => state.session)),
@@ -1998,6 +2341,8 @@ export const makeAxleAdapter = (options: AxleAdapterOptions) =>
         Effect.sync(() => {
           for (const child of activeChildren.values()) child.kill();
           activeChildren.clear();
+          for (const process of persistentProcesses.values()) process.child.kill();
+          persistentProcesses.clear();
           sessions.clear();
         }),
       subscribeEvents: PubSub.subscribe(runtimeEvents),

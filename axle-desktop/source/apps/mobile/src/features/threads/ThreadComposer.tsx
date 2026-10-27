@@ -1,4 +1,3 @@
-import { isLiquidGlassSupported, LiquidGlassView } from "@callstack/liquid-glass";
 import type {
   EnvironmentId,
   MessageId,
@@ -27,6 +26,7 @@ import {
 } from "react-native";
 import ImageViewing from "react-native-image-viewing";
 import Animated, { FadeIn, FadeOut, LinearTransition } from "react-native-reanimated";
+import { isLiquidGlassSupported, LiquidGlassView } from "../../lib/liquidGlass";
 import { useThemeColor } from "../../lib/useThemeColor";
 import { armAgentAwarenessLiveActivityForLocalWork } from "../agent-awareness/remoteRegistration";
 import { scopedThreadKey } from "../../lib/scopedEntities";

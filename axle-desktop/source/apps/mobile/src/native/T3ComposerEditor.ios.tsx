@@ -17,6 +17,7 @@ import { resolveMarkdownFileIcon } from "@axle/mobile-markdown-text/links";
 import { useThemeColor } from "../lib/useThemeColor";
 import { useFontFamily } from "../lib/useFontFamily";
 import { useScaledTextRole } from "../features/settings/appearance/useScaledTextRole";
+import { isExpoGo } from "../lib/expoGo";
 import {
   acknowledgeComposerNativeEvent,
   isComposerNativeEcho,
@@ -24,6 +25,7 @@ import {
   resolveComposerControlledEventCount,
   type ComposerNativeEventSnapshot,
 } from "./composerEditorRevision";
+import { ComposerEditorFallback } from "./T3ComposerEditorFallback";
 import type { ComposerEditorProps, ComposerEditorSelection } from "./T3ComposerEditor.types";
 
 const NATIVE_MODULE_NAME = "T3ComposerEditor";
@@ -84,7 +86,7 @@ function fileIconUri(path: string): string {
   return Image.resolveAssetSource(markdownFileIconSource(resolveMarkdownFileIcon(path))).uri;
 }
 
-export function ComposerEditor({
+function NativeComposerEditor({
   ref,
   skills = EMPTY_SKILLS,
   selection,
@@ -276,6 +278,13 @@ export function ComposerEditor({
       onComposerSubmit={onSubmit}
     />
   );
+}
+
+export function ComposerEditor(props: ComposerEditorProps) {
+  if (isExpoGo()) {
+    return <ComposerEditorFallback {...props} />;
+  }
+  return <NativeComposerEditor {...props} />;
 }
 
 export type {

@@ -87,6 +87,7 @@ import * as ProviderRegistry from "./provider/Services/ProviderRegistry.ts";
 import { makeManualOnlyProviderMaintenanceCapabilities } from "./provider/providerMaintenance.ts";
 import * as ServerLifecycleEvents from "./serverLifecycleEvents.ts";
 import * as ServerRuntimeStartup from "./serverRuntimeStartup.ts";
+import * as ScheduledTasksService from "./schedules/Service.ts";
 import * as ServerSettings from "./serverSettings.ts";
 import * as TerminalManager from "./terminal/Manager.ts";
 import * as PreviewManager from "./preview/Manager.ts";
@@ -800,6 +801,16 @@ const buildAppUnderTest = (options?: {
           hasCredential: Effect.succeed(false),
           clear: Effect.void,
           ...options?.layers?.cloudCliTokenManager,
+        }),
+      ),
+      Layer.provide(
+        Layer.mock(ScheduledTasksService.ScheduledTasks)({
+          initialize: () => Promise.resolve(),
+          list: () => Promise.resolve([]),
+          save: () => Promise.reject(new Error("Unexpected scheduled task save.")),
+          remove: () => Promise.resolve({ deleted: false }),
+          runNow: () => Promise.reject(new Error("Unexpected scheduled task run.")),
+          tick: () => Promise.resolve(),
         }),
       ),
       Layer.provideMerge(makeAuthTestLayer()),
@@ -6977,17 +6988,30 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
           ),
         );
 
-        assert.equal(response.sequence, 5);
+        assert.equal(response.sequence, 8);
         assert.deepEqual(
           dispatchedCommands.map((command) => command.type),
           [
             "thread.create",
+            "thread.message.record",
+            "thread.activity.append",
             "thread.meta.update",
+            "thread.activity.append",
             "thread.activity.append",
             "thread.activity.append",
             "thread.turn.start",
           ],
         );
+        const recordedMessage = dispatchedCommands[1];
+        assertTrue(recordedMessage?.type === "thread.message.record");
+        if (recordedMessage?.type === "thread.message.record") {
+          assert.deepEqual(recordedMessage.message, {
+            messageId: MessageId.make("msg-bootstrap"),
+            role: "user",
+            text: "hello",
+            attachments: [],
+          });
+        }
         assert.deepEqual(createWorktree.mock.calls[0]?.[0], {
           cwd: "/tmp/project",
           refName: fetchedOriginCommit,
@@ -7017,15 +7041,41 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         });
         assert.deepEqual(refreshStatus.mock.calls[0]?.[0], "/tmp/bootstrap-worktree");
 
-        const setupActivities = dispatchedCommands.filter(
+        const activities = dispatchedCommands.filter(
           (command): command is Extract<OrchestrationCommand, { type: "thread.activity.append" }> =>
             command.type === "thread.activity.append",
         );
         assert.deepEqual(
-          setupActivities.map((command) => command.activity.kind),
-          ["setup-script.requested", "setup-script.started"],
+          activities.map((command) => command.activity.kind),
+          ["tool.started", "tool.completed", "setup-script.requested", "setup-script.started"],
         );
-        const finalCommand = dispatchedCommands[4];
+        const firstActivityPayload = activities[0]?.activity.payload as
+          | Record<string, unknown>
+          | undefined;
+        const worktreeToolCallId = firstActivityPayload?.toolCallId as string | undefined;
+        assert.deepEqual(activities[0]?.activity.payload, {
+          toolName: "create_worktree",
+          toolCallId: worktreeToolCallId,
+          title: "Creating worktree",
+          status: "inProgress",
+          data: {
+            baseBranch: "main",
+            branch: "t3code/bootstrap-refName",
+          },
+        });
+        assert.equal(activities[0]?.activity.summary, "Creating worktree");
+        assert.equal(activities[1]?.activity.summary, "Worktree ready");
+        assert.deepEqual(activities[1]?.activity.payload, {
+          toolName: "create_worktree",
+          toolCallId: worktreeToolCallId,
+          title: "Creating worktree",
+          status: "completed",
+          data: {
+            branch: "t3code/bootstrap-refName",
+            worktreePath: "/tmp/bootstrap-worktree",
+          },
+        });
+        const finalCommand = dispatchedCommands[7];
         assertTrue(finalCommand?.type === "thread.turn.start");
         if (finalCommand?.type === "thread.turn.start") {
           assert.equal(finalCommand.bootstrap, undefined);
@@ -7120,14 +7170,23 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         ),
       );
 
-      assert.equal(response.sequence, 4);
+      assert.equal(response.sequence, 7);
       assert.deepEqual(
         dispatchedCommands.map((command) => command.type),
-        ["thread.create", "thread.meta.update", "thread.activity.append", "thread.turn.start"],
+        [
+          "thread.create",
+          "thread.message.record",
+          "thread.activity.append",
+          "thread.meta.update",
+          "thread.activity.append",
+          "thread.activity.append",
+          "thread.turn.start",
+        ],
       );
       const setupFailureActivity = dispatchedCommands.find(
         (command): command is Extract<OrchestrationCommand, { type: "thread.activity.append" }> =>
-          command.type === "thread.activity.append",
+          command.type === "thread.activity.append" &&
+          command.activity.kind === "setup-script.failed",
       );
       assert.equal(setupFailureActivity?.activity.kind, "setup-script.failed");
       assert.deepEqual(setupFailureActivity?.activity.payload, {
@@ -7241,10 +7300,18 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         ),
       );
 
-      assert.equal(response.sequence, 4);
+      assert.equal(response.sequence, 7);
       assert.deepEqual(
         dispatchedCommands.map((command) => command.type),
-        ["thread.create", "thread.meta.update", "thread.activity.append", "thread.turn.start"],
+        [
+          "thread.create",
+          "thread.message.record",
+          "thread.activity.append",
+          "thread.meta.update",
+          "thread.activity.append",
+          "thread.activity.append",
+          "thread.turn.start",
+        ],
       );
       const setupActivities = dispatchedCommands.filter(
         (command): command is Extract<OrchestrationCommand, { type: "thread.activity.append" }> =>
@@ -7252,7 +7319,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       );
       assert.deepEqual(
         setupActivities.map((command) => command.activity.kind),
-        ["setup-script.requested"],
+        ["tool.started", "tool.completed", "setup-script.requested"],
       );
       assertTrue(
         setupActivities.every((command) => command.activity.kind !== "setup-script.failed"),
@@ -7330,7 +7397,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       assert.include(result.failure.message, "worktree exploded");
       assert.deepEqual(
         dispatchedCommands.map((command) => command.type),
-        ["thread.create", "thread.delete"],
+        ["thread.create", "thread.message.record", "thread.activity.append"],
       );
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );

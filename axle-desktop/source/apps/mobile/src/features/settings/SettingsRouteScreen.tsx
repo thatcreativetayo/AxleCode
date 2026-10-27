@@ -1,7 +1,6 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
-import * as Updates from "expo-updates";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackScreenOptions } from "../../native/StackHeader";
 import { SymbolView } from "../../components/AppSymbol";
@@ -20,6 +19,7 @@ import {
 } from "@axle/client-runtime/state/runtime";
 import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
 import { AppText as Text } from "../../components/AppText";
+import { getExpoUpdatesInfo } from "../../lib/expoUpdates";
 import { supportsAgentAwarenessPush } from "../agent-awareness/capabilities";
 import { setLiveActivityUpdatesEnabled } from "../agent-awareness/liveActivityPreferences";
 import { requestAgentNotificationPermission } from "../agent-awareness/notificationPermissions";
@@ -524,11 +524,12 @@ function AppSettingsSection() {
   // Which JS is actually running: the bundle shipped in the binary, or an OTA
   // update downloaded on top of it. Surfacing this makes "am I even on the
   // right build?" answerable at a glance.
-  const bundleLabel = Updates.isEnabled
-    ? Updates.isEmbeddedLaunch
+  const updates = getExpoUpdatesInfo();
+  const bundleLabel = updates.isEnabled
+    ? updates.isEmbeddedLaunch
       ? "Embedded"
-      : Updates.updateId
-        ? `OTA ${Updates.updateId.slice(0, 7)}`
+      : updates.updateId
+        ? `OTA ${updates.updateId.slice(0, 7)}`
         : null
     : null;
 

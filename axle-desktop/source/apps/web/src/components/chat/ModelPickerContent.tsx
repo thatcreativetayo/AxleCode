@@ -123,13 +123,16 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
   const highlightedModelKeyRef = useRef<string | null>(null);
   const favorites = useClientSettings((s) => s.favorites ?? []);
   const isAxleRuntime = instanceEntries.some((entry) => entry.driverKind === "axle");
-  // Paid Axle gateway models are disabled for accounts positively resolved to
-  // a Free plan; the set is empty in every other case, so nothing else changes.
+  // Paid hosted models lock only for a positively resolved Free plan. Offline
+  // packs lock until a paid plan resolves, because there is no gateway behind
+  // them to enforce the entitlement at request time.
   const lockedAxleModelSlugs = useLockedAxleModelSlugs();
   const lockedModelReason = useCallback(
     (slug: string): string | null =>
       lockedAxleModelSlugs.has(slug)
-        ? "Included with paid plans. Upgrade to use this model."
+        ? slug.startsWith("axle-local/")
+          ? "Included with a higher paid plan. Upgrade to use this offline model."
+          : "Included with paid plans. Upgrade to use this model."
         : null,
     [lockedAxleModelSlugs],
   );

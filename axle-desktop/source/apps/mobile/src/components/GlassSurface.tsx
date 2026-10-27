@@ -1,4 +1,3 @@
-import { GlassView, isGlassEffectAPIAvailable } from "expo-glass-effect";
 import type { ReactNode } from "react";
 import {
   Platform,
@@ -8,6 +7,7 @@ import {
   type ViewProps,
   type ViewStyle,
 } from "react-native";
+import { GlassView, isGlassEffectAPIAvailable } from "../lib/glassEffect";
 import { useThemeColor } from "../lib/useThemeColor";
 
 export interface GlassSurfaceProps extends Omit<ViewProps, "className"> {

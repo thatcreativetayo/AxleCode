@@ -9,6 +9,7 @@
     "dev:web": "node scripts/dev-runner.ts dev:web",
     "dev:marketing": "vp run --filter @axle/marketing dev",
     "dev:desktop": "node scripts/dev-runner.ts dev:desktop",
+    "local-runtime:install": "node scripts/install-llama-runtime.mjs",
     "start": "vp run --filter t3 start",
     "start:desktop": "vp run --filter @axle/desktop start",
     "start:marketing": "vp run --filter @axle/marketing preview",

@@ -432,7 +432,28 @@ export const CheckpointSettings = Schema.Struct({
 });
 export type CheckpointSettings = typeof CheckpointSettings.Type;
 
+export const McpServerConnectionStatus = Schema.Struct({
+  id: TrimmedNonEmptyString,
+  status: Schema.Literals(["online", "offline"]),
+  checkedAt: Schema.Number,
+  toolCount: Schema.Number,
+});
+export type McpServerConnectionStatus = typeof McpServerConnectionStatus.Type;
+
+export const McpServerConfig = Schema.Struct({
+  id: TrimmedNonEmptyString,
+  name: TrimmedNonEmptyString,
+  url: Schema.String.check(Schema.isPattern(/^https?:\/\//u)),
+  authorizationToken: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
+  authorizationTokenRedacted: Schema.Boolean.pipe(
+    Schema.withDecodingDefault(Effect.succeed(false)),
+  ),
+  enabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
+});
+export type McpServerConfig = typeof McpServerConfig.Type;
+
 export const ServerSettings = Schema.Struct({
+  mcpServers: Schema.Array(McpServerConfig).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
   customInstructions: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
   axlePersonality: AxlePersonality.pipe(
     Schema.withDecodingDefault(Effect.succeed("coding" as const)),
@@ -594,6 +615,7 @@ const CheckpointSettingsPatch = Schema.Struct({
 });
 
 export const ServerSettingsPatch = Schema.Struct({
+  mcpServers: Schema.optionalKey(Schema.Array(McpServerConfig)),
   // Server settings
   customInstructions: Schema.optionalKey(TrimmedString),
   axlePersonality: Schema.optionalKey(AxlePersonality),

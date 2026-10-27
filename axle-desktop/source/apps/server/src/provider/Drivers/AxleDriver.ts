@@ -4,12 +4,15 @@ import * as NodeFS from "node:fs";
 import {
   ProviderDriverKind,
   TextGenerationError,
+  LOCAL_MODEL_PACK_IDS,
+  type LocalModelPackId,
   type ProviderInstanceId,
   type ProviderWorkspaceContext,
   type ModelSelection,
   type ServerProvider,
 } from "@axle/contracts";
 import { getModelSelectionStringOptionValue } from "@axle/shared/model";
+import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as PubSub from "effect/PubSub";
 import * as Ref from "effect/Ref";
@@ -27,9 +30,11 @@ import {
 } from "../ProviderDriver.ts";
 import {
   makeAxleAdapter,
+  parseAxleModelSelection,
   resolveAxleRuntimeContextWindow,
   runAxleTextGeneration,
 } from "../Layers/AxleAdapter.ts";
+import { localModelManager } from "../../localModels/manager.ts";
 import { ProviderEventLoggers } from "../Layers/ProviderEventLoggers.ts";
 import { discoverAxleModels, type AxleModelDiscovery } from "./AxleModelCatalog.ts";
 import { ServerSettingsService } from "../../serverSettings.ts";
@@ -147,9 +152,16 @@ export function makeAxleThreadTitlePrompt(message: string): string {
   ].join("\n");
 }
 
+class AxleOfflineRuntimeError extends Data.TaggedError("AxleOfflineRuntimeError")<{
+  readonly detail: string;
+  readonly cause?: unknown;
+}> {}
+
 function makeTextGeneration(input: {
   readonly binaryPath: string;
   readonly environment: NodeJS.ProcessEnv;
+  readonly localModelsDir?: string | undefined;
+  readonly localModelsStatePath?: string | undefined;
 }): TextGeneration.TextGeneration["Service"] {
   const run = (
     operation: string,
@@ -159,24 +171,61 @@ function makeTextGeneration(input: {
     workspaceContext: ProviderWorkspaceContext = "project",
     systemPrompt?: string,
   ) =>
-    runAxleTextGeneration({
-      binaryPath: input.binaryPath,
-      cwd,
-      prompt,
-      model: modelSelection.model,
-      ...(workspaceContext === "none" ? { workspaceContext } : {}),
-      ...(systemPrompt ? { customInstructions: systemPrompt } : {}),
-      ...resolveAxleTextGenerationRuntimeOptions({
-        modelSelection,
-        environment: input.environment,
-      }),
-      environment: input.environment,
+    Effect.gen(function* () {
+      let environment = input.environment;
+      const selection = parseAxleModelSelection(modelSelection.model);
+      if (
+        selection.provider === "axle-local" &&
+        LOCAL_MODEL_PACK_IDS.includes(selection.model as LocalModelPackId)
+      ) {
+        const localModelsDir = input.localModelsDir;
+        const localModelsStatePath = input.localModelsStatePath;
+        if (!localModelsDir || !localModelsStatePath) {
+          return yield* new AxleOfflineRuntimeError({
+            detail: "Axle Offline is not configured for this server.",
+          });
+        }
+        const runtime = yield* Effect.tryPromise({
+          try: () =>
+            localModelManager({
+              modelsDir: localModelsDir,
+              statePath: localModelsStatePath,
+            }).ensureRuntime(selection.model as LocalModelPackId),
+          catch: (cause) =>
+            new AxleOfflineRuntimeError({
+              detail:
+                cause instanceof Error
+                  ? cause.message
+                  : "The Axle Offline runtime could not be started.",
+              cause,
+            }),
+        });
+        environment = {
+          ...environment,
+          AXLE_LOCAL_BASE_URL: runtime.baseUrl,
+          AXLE_LOCAL_API_KEY: runtime.apiKey || "axle-local",
+          AXLE_LOCAL_MODELS_STATE_PATH: localModelsStatePath,
+        };
+      }
+      return yield* runAxleTextGeneration({
+        binaryPath: input.binaryPath,
+        cwd,
+        prompt,
+        model: modelSelection.model,
+        ...(workspaceContext === "none" ? { workspaceContext } : {}),
+        ...(systemPrompt ? { customInstructions: systemPrompt } : {}),
+        ...resolveAxleTextGenerationRuntimeOptions({
+          modelSelection,
+          environment,
+        }),
+        environment,
+      });
     }).pipe(
       Effect.mapError(
         (cause) =>
           new TextGenerationError({
             operation,
-            detail: cause.message,
+            detail: cause instanceof AxleOfflineRuntimeError ? cause.detail : cause.message,
             cause,
           }),
       ),
@@ -268,6 +317,7 @@ export const AxleDriver: ProviderDriver<
       const serverConfig = yield* ServerConfig;
       const eventLoggers = yield* ProviderEventLoggers;
       const processEnvironment = { ...mergeProviderInstanceEnvironment(environment) };
+      processEnvironment.AXLE_LOCAL_MODELS_STATE_PATH = serverConfig.localModelsStatePath;
       const hasConfiguredOllamaCloudKey = environment?.some(
         (variable) => variable.name === "OLLAMA_API_KEY" && variable.value.trim().length > 0,
       );
@@ -313,6 +363,8 @@ export const AxleDriver: ProviderDriver<
         binaryPath,
         attachmentsDir: serverConfig.attachmentsDir,
         environment: processEnvironment,
+        localModelsDir: serverConfig.modelsDir,
+        localModelsStatePath: serverConfig.localModelsStatePath,
         ...(eventLoggers.native ? { nativeEventLogger: eventLoggers.native } : {}),
         getCustomInstructions: () =>
           serverSettings.getSettings.pipe(
@@ -352,7 +404,12 @@ export const AxleDriver: ProviderDriver<
           streamChanges: Stream.fromPubSub(snapshotChanges),
         },
         adapter,
-        textGeneration: makeTextGeneration({ binaryPath, environment: processEnvironment }),
+        textGeneration: makeTextGeneration({
+          binaryPath,
+          environment: processEnvironment,
+          localModelsDir: serverConfig.modelsDir,
+          localModelsStatePath: serverConfig.localModelsStatePath,
+        }),
       } satisfies ProviderInstance;
     }),
 };

@@ -14,7 +14,7 @@ pub mod tool;
 pub mod web_search;
 pub mod write;
 
-pub use bash::BashTool;
+pub use bash::{BashMonitorTool, BashTool, CommandMonitor};
 pub use edit::EditTool;
 pub use execution::{
     ExecutionError, ExecutionOutcome, ExecutionRequest, ExecutionTarget, LocalExecutionTarget,

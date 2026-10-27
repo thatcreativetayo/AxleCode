@@ -23,12 +23,14 @@ import { Route as SettingsPluginsRouteImport } from './routes/settings.plugins'
 import { Route as SettingsPersonalizeRouteImport } from './routes/settings.personalize'
 import { Route as SettingsModelsRouteImport } from './routes/settings.models'
 import { Route as SettingsMemoryRouteImport } from './routes/settings.memory'
+import { Route as SettingsMcpRouteImport } from './routes/settings.mcp'
 import { Route as SettingsKeybindingsRouteImport } from './routes/settings.keybindings'
 import { Route as SettingsInstructionsRouteImport } from './routes/settings.instructions'
 import { Route as SettingsGeneralRouteImport } from './routes/settings.general'
 import { Route as SettingsDiagnosticsRouteImport } from './routes/settings.diagnostics'
 import { Route as SettingsBillingRouteImport } from './routes/settings.billing'
 import { Route as SettingsArchivedRouteImport } from './routes/settings.archived'
+import { Route as SettingsAppearanceRouteImport } from './routes/settings.appearance'
 import { Route as SettingsAccountRouteImport } from './routes/settings.account'
 import { Route as SettingsAccountIndexRouteImport } from './routes/settings.account.index'
 import { Route as SettingsAccountSessionsRouteImport } from './routes/settings.account.sessions'
@@ -109,6 +111,11 @@ const SettingsMemoryRoute = SettingsMemoryRouteImport.update({
   path: '/memory',
   getParentRoute: () => SettingsRoute,
 } as any)
+const SettingsMcpRoute = SettingsMcpRouteImport.update({
+  id: '/mcp',
+  path: '/mcp',
+  getParentRoute: () => SettingsRoute,
+} as any)
 const SettingsKeybindingsRoute = SettingsKeybindingsRouteImport.update({
   id: '/keybindings',
   path: '/keybindings',
@@ -137,6 +144,11 @@ const SettingsBillingRoute = SettingsBillingRouteImport.update({
 const SettingsArchivedRoute = SettingsArchivedRouteImport.update({
   id: '/archived',
   path: '/archived',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsAppearanceRoute = SettingsAppearanceRouteImport.update({
+  id: '/appearance',
+  path: '/appearance',
   getParentRoute: () => SettingsRoute,
 } as any)
 const SettingsAccountRoute = SettingsAccountRouteImport.update({
@@ -202,12 +214,14 @@ export interface FileRoutesByFullPath {
   '/schedules': typeof SchedulesRoute
   '/settings': typeof SettingsRouteWithChildren
   '/settings/account': typeof SettingsAccountRouteWithChildren
+  '/settings/appearance': typeof SettingsAppearanceRoute
   '/settings/archived': typeof SettingsArchivedRoute
   '/settings/billing': typeof SettingsBillingRoute
   '/settings/diagnostics': typeof SettingsDiagnosticsRoute
   '/settings/general': typeof SettingsGeneralRoute
   '/settings/instructions': typeof SettingsInstructionsRoute
   '/settings/keybindings': typeof SettingsKeybindingsRoute
+  '/settings/mcp': typeof SettingsMcpRoute
   '/settings/memory': typeof SettingsMemoryRoute
   '/settings/models': typeof SettingsModelsRoute
   '/settings/personalize': typeof SettingsPersonalizeRoute
@@ -231,12 +245,14 @@ export interface FileRoutesByTo {
   '/pull-requests': typeof PullRequestsRoute
   '/schedules': typeof SchedulesRoute
   '/settings': typeof SettingsRouteWithChildren
+  '/settings/appearance': typeof SettingsAppearanceRoute
   '/settings/archived': typeof SettingsArchivedRoute
   '/settings/billing': typeof SettingsBillingRoute
   '/settings/diagnostics': typeof SettingsDiagnosticsRoute
   '/settings/general': typeof SettingsGeneralRoute
   '/settings/instructions': typeof SettingsInstructionsRoute
   '/settings/keybindings': typeof SettingsKeybindingsRoute
+  '/settings/mcp': typeof SettingsMcpRoute
   '/settings/memory': typeof SettingsMemoryRoute
   '/settings/models': typeof SettingsModelsRoute
   '/settings/personalize': typeof SettingsPersonalizeRoute
@@ -264,12 +280,14 @@ export interface FileRoutesById {
   '/schedules': typeof SchedulesRoute
   '/settings': typeof SettingsRouteWithChildren
   '/settings/account': typeof SettingsAccountRouteWithChildren
+  '/settings/appearance': typeof SettingsAppearanceRoute
   '/settings/archived': typeof SettingsArchivedRoute
   '/settings/billing': typeof SettingsBillingRoute
   '/settings/diagnostics': typeof SettingsDiagnosticsRoute
   '/settings/general': typeof SettingsGeneralRoute
   '/settings/instructions': typeof SettingsInstructionsRoute
   '/settings/keybindings': typeof SettingsKeybindingsRoute
+  '/settings/mcp': typeof SettingsMcpRoute
   '/settings/memory': typeof SettingsMemoryRoute
   '/settings/models': typeof SettingsModelsRoute
   '/settings/personalize': typeof SettingsPersonalizeRoute
@@ -298,12 +316,14 @@ export interface FileRouteTypes {
     | '/schedules'
     | '/settings'
     | '/settings/account'
+    | '/settings/appearance'
     | '/settings/archived'
     | '/settings/billing'
     | '/settings/diagnostics'
     | '/settings/general'
     | '/settings/instructions'
     | '/settings/keybindings'
+    | '/settings/mcp'
     | '/settings/memory'
     | '/settings/models'
     | '/settings/personalize'
@@ -327,12 +347,14 @@ export interface FileRouteTypes {
     | '/pull-requests'
     | '/schedules'
     | '/settings'
+    | '/settings/appearance'
     | '/settings/archived'
     | '/settings/billing'
     | '/settings/diagnostics'
     | '/settings/general'
     | '/settings/instructions'
     | '/settings/keybindings'
+    | '/settings/mcp'
     | '/settings/memory'
     | '/settings/models'
     | '/settings/personalize'
@@ -359,12 +381,14 @@ export interface FileRouteTypes {
     | '/schedules'
     | '/settings'
     | '/settings/account'
+    | '/settings/appearance'
     | '/settings/archived'
     | '/settings/billing'
     | '/settings/diagnostics'
     | '/settings/general'
     | '/settings/instructions'
     | '/settings/keybindings'
+    | '/settings/mcp'
     | '/settings/memory'
     | '/settings/models'
     | '/settings/personalize'
@@ -493,6 +517,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsMemoryRouteImport
       parentRoute: typeof SettingsRoute
     }
+    '/settings/mcp': {
+      id: '/settings/mcp'
+      path: '/mcp'
+      fullPath: '/settings/mcp'
+      preLoaderRoute: typeof SettingsMcpRouteImport
+      parentRoute: typeof SettingsRoute
+    }
     '/settings/keybindings': {
       id: '/settings/keybindings'
       path: '/keybindings'
@@ -533,6 +564,13 @@ declare module '@tanstack/react-router' {
       path: '/archived'
       fullPath: '/settings/archived'
       preLoaderRoute: typeof SettingsArchivedRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/appearance': {
+      id: '/settings/appearance'
+      path: '/appearance'
+      fullPath: '/settings/appearance'
+      preLoaderRoute: typeof SettingsAppearanceRouteImport
       parentRoute: typeof SettingsRoute
     }
     '/settings/account': {
@@ -648,12 +686,14 @@ const SettingsAccountRouteWithChildren = SettingsAccountRoute._addFileChildren(
 
 interface SettingsRouteChildren {
   SettingsAccountRoute: typeof SettingsAccountRouteWithChildren
+  SettingsAppearanceRoute: typeof SettingsAppearanceRoute
   SettingsArchivedRoute: typeof SettingsArchivedRoute
   SettingsBillingRoute: typeof SettingsBillingRoute
   SettingsDiagnosticsRoute: typeof SettingsDiagnosticsRoute
   SettingsGeneralRoute: typeof SettingsGeneralRoute
   SettingsInstructionsRoute: typeof SettingsInstructionsRoute
   SettingsKeybindingsRoute: typeof SettingsKeybindingsRoute
+  SettingsMcpRoute: typeof SettingsMcpRoute
   SettingsMemoryRoute: typeof SettingsMemoryRoute
   SettingsModelsRoute: typeof SettingsModelsRoute
   SettingsPersonalizeRoute: typeof SettingsPersonalizeRoute
@@ -663,12 +703,14 @@ interface SettingsRouteChildren {
 
 const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsAccountRoute: SettingsAccountRouteWithChildren,
+  SettingsAppearanceRoute: SettingsAppearanceRoute,
   SettingsArchivedRoute: SettingsArchivedRoute,
   SettingsBillingRoute: SettingsBillingRoute,
   SettingsDiagnosticsRoute: SettingsDiagnosticsRoute,
   SettingsGeneralRoute: SettingsGeneralRoute,
   SettingsInstructionsRoute: SettingsInstructionsRoute,
   SettingsKeybindingsRoute: SettingsKeybindingsRoute,
+  SettingsMcpRoute: SettingsMcpRoute,
   SettingsMemoryRoute: SettingsMemoryRoute,
   SettingsModelsRoute: SettingsModelsRoute,
   SettingsPersonalizeRoute: SettingsPersonalizeRoute,

@@ -54,6 +54,7 @@ import {
 } from "../chat/providerIconUtils";
 import { Button } from "../ui/button";
 import { Switch } from "../ui/switch";
+import { AxleOfflineSettings } from "./AxleOfflineSettings";
 import { SettingsPageContainer, SettingsSection } from "./settingsLayout";
 
 type Logo = ComponentType<SVGProps<SVGSVGElement>>;
@@ -119,6 +120,7 @@ const RESERVED_ENV_PREFIXES: ReadonlySet<string> = new Set([
   "DEEPSEEK",
   "XAI",
   "AXLE",
+  "AXLE_LOCAL",
 ]);
 
 /**
@@ -617,6 +619,12 @@ export function ModelsSettingsPanel() {
       title="Providers"
       description="Axle is included. Connect your own providers to bring their models into the picker."
     >
+      <AxleOfflineSettings
+        onModelsChanged={() => {
+          void refreshAxleProvider().catch(() => {});
+        }}
+      />
+
       <SettingsSection title="Provider configuration">
         <details className="group">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-5 py-4 text-[13px] font-medium text-foreground outline-none transition-colors hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">

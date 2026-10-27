@@ -1,4 +1,4 @@
-use crate::bash::BashTool;
+use crate::bash::{BashMonitorTool, BashTool};
 use crate::edit::EditTool;
 use crate::execution::{ExecutionTarget, LocalExecutionTarget};
 use crate::find::FindTool;
@@ -94,10 +94,9 @@ impl ToolRegistry {
         reg.register_builtin(Arc::new(ReadTool::new(limits.read_bytes)));
         reg.register_builtin(Arc::new(WriteTool));
         reg.register_builtin(Arc::new(EditTool));
-        reg.register_builtin(Arc::new(BashTool::with_target(
-            limits.bash_bytes,
-            reg.execution_target.clone(),
-        )));
+        let bash = BashTool::with_target(limits.bash_bytes, reg.execution_target.clone());
+        reg.register_builtin(Arc::new(BashMonitorTool::new(bash.monitor())));
+        reg.register_builtin(Arc::new(bash));
         reg.register_builtin(Arc::new(LsTool));
         reg.register_builtin(Arc::new(GrepTool));
         reg.register_builtin(Arc::new(WebSearchTool));
@@ -114,10 +113,12 @@ impl ToolRegistry {
     pub fn set_execution_target(&mut self, target: Arc<dyn ExecutionTarget>) {
         self.execution_target = target.clone();
         if self.tools.contains_key("bash") {
+            let bash = BashTool::with_target(self.bash_output_limit, target);
             self.tools.insert(
-                "bash".to_string(),
-                Arc::new(BashTool::with_target(self.bash_output_limit, target)),
+                "bash_monitor".to_string(),
+                Arc::new(BashMonitorTool::new(bash.monitor())),
             );
+            self.tools.insert("bash".to_string(), Arc::new(bash));
         }
     }
 

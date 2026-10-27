@@ -2,7 +2,11 @@ import type { CloudEntitlements } from "@axle/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import type { AxleModelRate } from "../account/axleGateway";
-import { lockedAxleModelSlugs } from "./axleModelAccess";
+import {
+  lockedAxleLocalModelSlugs,
+  lockedAxleModelSlugs,
+  localModelPackAllowed,
+} from "./axleModelAccess";
 
 const rate = (id: string, plan: "free" | "paid"): AxleModelRate => ({
   id,
@@ -52,5 +56,47 @@ describe("locked Axle model slugs", () => {
 
   it("fails open for an unrecognized plan id", () => {
     expect(lockedAxleModelSlugs(entitlements("enterprise"), rates).size).toBe(0);
+  });
+});
+
+describe("Axle Offline pack access", () => {
+  it("fails closed when the plan is unresolved", () => {
+    expect(localModelPackAllowed(null, "compact")).toBe(false);
+    expect([...lockedAxleLocalModelSlugs(null)]).toHaveLength(6);
+  });
+
+  it("maps packs to their minimum paid tier", () => {
+    for (const packId of ["compact", "standard"] as const) {
+      expect(localModelPackAllowed("free", packId)).toBe(false);
+      expect(localModelPackAllowed("pro", packId)).toBe(true);
+    }
+    expect(localModelPackAllowed("pro", "advanced")).toBe(false);
+    expect(localModelPackAllowed("pro-plus", "advanced")).toBe(true);
+    expect(localModelPackAllowed("pro-plus", "coder")).toBe(true);
+    expect(localModelPackAllowed("pro-plus", "max")).toBe(false);
+    expect(localModelPackAllowed("ultra", "max")).toBe(true);
+    expect(localModelPackAllowed("ultra", "vision")).toBe(true);
+  });
+
+  it("locks only the packs the plan does not include", () => {
+    expect([...lockedAxleLocalModelSlugs(entitlements("free"))].sort()).toEqual([
+      "axle-local/advanced",
+      "axle-local/coder",
+      "axle-local/compact",
+      "axle-local/max",
+      "axle-local/standard",
+      "axle-local/vision",
+    ]);
+    expect([...lockedAxleLocalModelSlugs(entitlements("pro"))].sort()).toEqual([
+      "axle-local/advanced",
+      "axle-local/coder",
+      "axle-local/max",
+      "axle-local/vision",
+    ]);
+    expect([...lockedAxleLocalModelSlugs(entitlements("pro-plus"))].sort()).toEqual([
+      "axle-local/max",
+      "axle-local/vision",
+    ]);
+    expect([...lockedAxleLocalModelSlugs(entitlements("ultra"))]).toHaveLength(0);
   });
 });

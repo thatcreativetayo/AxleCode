@@ -1,8 +1,9 @@
 import { requireNativeView } from "expo";
 import type { PropsWithChildren } from "react";
-import type { NativeSyntheticEvent, ViewProps } from "react-native";
+import { View, type NativeSyntheticEvent, type ViewProps } from "react-native";
 
 import type { HardwareKeyboardCommand } from "../features/keyboard/hardwareKeyboardCommands";
+import { isExpoGo } from "../lib/expoGo";
 
 interface NativeKeyboardCommandsProps extends ViewProps, PropsWithChildren {
   readonly enabledCommands: ReadonlyArray<HardwareKeyboardCommand>;
@@ -19,6 +20,10 @@ export function T3KeyboardCommands(
     readonly onCommand: (command: HardwareKeyboardCommand) => void;
   }>,
 ) {
+  if (isExpoGo()) {
+    return <View style={{ flex: 1 }}>{props.children}</View>;
+  }
+
   return (
     <NativeKeyboardCommands
       onCommand={(event) => props.onCommand(event.nativeEvent.command)}

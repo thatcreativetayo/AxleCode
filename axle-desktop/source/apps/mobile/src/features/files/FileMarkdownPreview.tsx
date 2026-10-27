@@ -4,7 +4,7 @@ import {
   type CustomRenderers,
   type NodeStyleOverrides,
   type PartialMarkdownTheme,
-} from "react-native-nitro-markdown";
+} from "../../lib/markdown";
 import { RefreshControl, ScrollView, Text as NativeText, View } from "react-native";
 
 import { tryOpenExternalUrl } from "../../lib/openExternalUrl";

@@ -1,4 +1,4 @@
-import { MenuView } from "@react-native-menu/menu";
+import type { MenuView } from "@react-native-menu/menu";
 import * as Haptics from "expo-haptics";
 import {
   cloneElement,
@@ -11,6 +11,7 @@ import { Platform, Pressable, useColorScheme, View } from "react-native";
 import { useThemeColor } from "../lib/useThemeColor";
 
 import { cn } from "../lib/cn";
+import { isExpoGo } from "../lib/expoGo";
 import { AndroidAnchoredMenu } from "./AndroidAnchoredMenu";
 import { SymbolView } from "./AppSymbol";
 import { AppText as Text } from "./AppText";
@@ -86,6 +87,11 @@ export function ControlPill(props: {
 // Android renders the token-styled AndroidAnchoredMenu, since the native
 // AppCompat popup can't be themed past its stock animation, metrics, and
 // submenu chrome.
+type NativeMenuModule = typeof import("@react-native-menu/menu");
+const nativeMenu: NativeMenuModule | null = isExpoGo()
+  ? null
+  : (require("@react-native-menu/menu") as NativeMenuModule);
+
 export function ControlPillMenu(
   props: Omit<ComponentProps<typeof MenuView>, "children" | "themeVariant"> & {
     readonly children: ReactNode;
@@ -94,7 +100,9 @@ export function ControlPillMenu(
 ) {
   const isDarkMode = useColorScheme() === "dark";
 
-  if (Platform.OS === "android") {
+  // Expo Go cannot render the native UIMenu, so use the in-window JS menu on
+  // iOS as well as Android.
+  if (Platform.OS === "android" || nativeMenu === null) {
     // Long-press menus keep their child interactive: the child element gets
     // an injected onLongPress (mirroring the iOS context-menu interaction)
     // so its own tap handling still works.
@@ -132,10 +140,11 @@ export function ControlPillMenu(
     );
   }
 
+  const NativeMenuView = nativeMenu.MenuView;
   const { className: _className, ...menuProps } = props;
   return (
-    <MenuView {...menuProps} themeVariant={isDarkMode ? "dark" : "light"}>
+    <NativeMenuView {...menuProps} themeVariant={isDarkMode ? "dark" : "light"}>
       {menuProps.children}
-    </MenuView>
+    </NativeMenuView>
   );
 }

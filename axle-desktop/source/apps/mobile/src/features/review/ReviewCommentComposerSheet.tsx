@@ -1,5 +1,4 @@
 import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
-import { TextInputWrapper } from "expo-paste-input";
 import type { EnvironmentId, ThreadId } from "@axle/contracts";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -10,7 +9,6 @@ import {
   useColorScheme,
   useWindowDimensions,
 } from "react-native";
-import { KeyboardAvoidingView, KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ImageViewing from "react-native-image-viewing";
 
@@ -19,8 +17,10 @@ import { SymbolView } from "../../components/AppSymbol";
 import { ComposerAttachmentStrip } from "../../components/ComposerAttachmentStrip";
 import { ControlPill } from "../../components/ControlPill";
 import { cn } from "../../lib/cn";
+import { KeyboardAvoidingView, KeyboardStickyView } from "../../lib/keyboard";
 import type { DraftComposerImageAttachment } from "../../lib/composerImages";
 import { convertPastedImagesToAttachments, pickComposerImages } from "../../lib/composerImages";
+import { TextInputWrapper } from "../../lib/pasteInput";
 import { useThemeColor } from "../../lib/useThemeColor";
 import { useNativePaste } from "../../lib/useNativePaste";
 import { setPendingConnectionError } from "../../state/use-remote-environment-registry";

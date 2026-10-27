@@ -26,7 +26,7 @@ import { LegendList, type LegendListRef } from "@legendapp/list/react";
 import { FileDiff } from "@pierre/diffs/react";
 import {
   deriveTimelineEntries,
-    formatDuration,
+  formatDuration,
   workEntryIndicatesToolFailure,
   workEntryIndicatesToolNeutralStatus,
   workEntryIndicatesToolSuccess,
@@ -40,6 +40,7 @@ import {
   resolveFileDiffPath,
 } from "../../lib/diffRendering";
 import ChatMarkdown from "../ChatMarkdown";
+import { LiquidGlassOrb } from "../liquid-glass-orb";
 import {
   BotIcon,
   BrainIcon,
@@ -1192,15 +1193,60 @@ function ProposedPlanTimelineRow({
   );
 }
 
+// Keep the orb's native 250px glass geometry and scale the host down so the
+// compact working row keeps its layout. The orb owns its own reduced-motion,
+// visibility and entrance behavior.
+function WorkingOrb() {
+  return (
+    <div className="relative size-4 shrink-0" aria-hidden="true">
+      <div className="pointer-events-none absolute left-1/2 top-1/2 size-[250px] -translate-x-1/2 -translate-y-1/2 scale-[0.064]">
+        <LiquidGlassOrb
+          baseColor="#ffffff"
+          colorA="#000000"
+          colorB="#4d4d4d"
+          colorC="#a9a9a9"
+          seed={145}
+          startTime={18}
+          speed={1.5}
+          distortion={0.8}
+          clusterCount={7.2}
+          clusterIntensity={3}
+          clusterSize={22.5}
+          scale={0.23}
+          spotSize={1.15}
+          rotation={0}
+          softness={0.31}
+          relief={2.94}
+          refraction={0.65}
+          roughness={0}
+          reflection={1.3}
+          caustics={0}
+          dispersion={1}
+          colorDistribution={0}
+          grain={0.3}
+          grainSize={1}
+          paused={false}
+          animateDistortion
+          grainMode="fine"
+          flowType="drift"
+          state="thinking"
+          thinkingAnimation="ripples"
+          searchingAnimation="lens"
+          preserveWhites
+          animateEntrance
+          size={250}
+          audioLevel={0}
+        />
+      </div>
+    </div>
+  );
+}
+
 function WorkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "working" }> }) {
   return (
     <div className="py-0.5 pl-1.5">
       <div className="flex items-center gap-2 pt-1 text-[11px] text-muted-foreground/70 tabular-nums">
-        <span className="inline-flex items-center gap-[3px]">
-          <span className="h-1 w-1 rounded-full bg-muted-foreground/30 animate-status-pulse" />
-          <span className="h-1 w-1 rounded-full bg-muted-foreground/30 animate-status-pulse [animation-delay:200ms]" />
-          <span className="h-1 w-1 rounded-full bg-muted-foreground/30 animate-status-pulse [animation-delay:400ms]" />
-        </span>
+        <WorkingOrb />
         <span>
           {row.createdAt ? (
             <>

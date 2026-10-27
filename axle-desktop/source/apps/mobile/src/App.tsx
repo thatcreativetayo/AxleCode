@@ -4,7 +4,6 @@ import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { StatusBar, useColorScheme } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { createStaticNavigation, DarkTheme, DefaultTheme } from "@react-navigation/native";
 
@@ -18,6 +17,7 @@ import { RootStack } from "./Stack";
 import { appAtomRegistry } from "./state/atom-registry";
 import { OverlayPortalHost } from "./components/OverlayPortal";
 import { StartupErrorBoundary, StartupErrorOverlay } from "./lib/startupErrorReporting";
+import { KeyboardProvider } from "./lib/keyboard";
 import { appBlurTargetRef } from "./lib/appBlurTarget";
 import { useThemeColor } from "./lib/useThemeColor";
 
@@ -52,42 +52,42 @@ export default function App() {
   return (
     <StartupErrorBoundary>
       <RegistryContext.Provider value={appAtomRegistry}>
-      <CloudAuthProvider>
-        <AppearancePreferencesProvider>
-          <GestureHandlerRootView className="flex-1">
-            <KeyboardProvider statusBarTranslucent>
-              <SafeAreaProvider>
-                <StatusBar
-                  barStyle={colorScheme === "dark" ? "light-content" : "dark-content"}
-                  backgroundColor={statusBarBg}
-                  translucent
-                />
-                {/* The navigation theme drives the NATIVE header appearance: native-stack
+        <CloudAuthProvider>
+          <AppearancePreferencesProvider>
+            <GestureHandlerRootView className="flex-1">
+              <KeyboardProvider statusBarTranslucent>
+                <SafeAreaProvider>
+                  <StatusBar
+                    barStyle={colorScheme === "dark" ? "light-content" : "dark-content"}
+                    backgroundColor={statusBarBg}
+                    translucent
+                  />
+                  {/* The navigation theme drives the NATIVE header appearance: native-stack
                     forwards `dark` as the nav bar's overrideUserInterfaceStyle. Without
                     this, React Navigation defaults to its light theme and every native
                     header (glass buttons, title, materials) is forced light even when
                     the system is in dark mode. */}
-                {/* Blur target for Android dropdown backdrops — see appBlurTarget.ts. */}
-                <BlurTargetView ref={appBlurTargetRef} style={{ flex: 1 }}>
-                  <IncomingShareProvider>
-                    <Navigation
-                      linking={appLinking}
-                      theme={colorScheme === "dark" ? DarkTheme : DefaultTheme}
-                    />
-                  </IncomingShareProvider>
-                  <ConfirmDialogHost />
-                </BlurTargetView>
-                {/* Anchored-menu overlays render here — in-window, so the
+                  {/* Blur target for Android dropdown backdrops — see appBlurTarget.ts. */}
+                  <BlurTargetView ref={appBlurTargetRef} style={{ flex: 1 }}>
+                    <IncomingShareProvider>
+                      <Navigation
+                        linking={appLinking}
+                        theme={colorScheme === "dark" ? DarkTheme : DefaultTheme}
+                      />
+                    </IncomingShareProvider>
+                    <ConfirmDialogHost />
+                  </BlurTargetView>
+                  {/* Anchored-menu overlays render here — in-window, so the
                     keyboard stays up while a dropdown is open. */}
-                <OverlayPortalHost />
-                {/* Last-resort surface for startup errors that would otherwise
+                  <OverlayPortalHost />
+                  {/* Last-resort surface for startup errors that would otherwise
                     kill the app before any screen renders. */}
-                <StartupErrorOverlay />
-              </SafeAreaProvider>
-            </KeyboardProvider>
-          </GestureHandlerRootView>
-        </AppearancePreferencesProvider>
-      </CloudAuthProvider>
+                  <StartupErrorOverlay />
+                </SafeAreaProvider>
+              </KeyboardProvider>
+            </GestureHandlerRootView>
+          </AppearancePreferencesProvider>
+        </CloudAuthProvider>
       </RegistryContext.Provider>
     </StartupErrorBoundary>
   );
