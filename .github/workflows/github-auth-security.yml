@@ -6,6 +6,9 @@ on:
       - 'axle-auth-worker/**'
       - 'axle-desktop/source/apps/desktop/**'
       - 'axle-desktop/source/apps/web/src/components/pullRequests/**'
+      - 'axle-desktop/source/package.json'
+      - 'axle-desktop/source/pnpm-lock.yaml'
+      - 'axle-desktop/source/pnpm-workspace.yaml'
       - '.github/workflows/github-auth-security.yml'
   push:
     branches:
@@ -14,6 +17,9 @@ on:
       - 'axle-auth-worker/**'
       - 'axle-desktop/source/apps/desktop/**'
       - 'axle-desktop/source/apps/web/src/components/pullRequests/**'
+      - 'axle-desktop/source/package.json'
+      - 'axle-desktop/source/pnpm-lock.yaml'
+      - 'axle-desktop/source/pnpm-workspace.yaml'
       - '.github/workflows/github-auth-security.yml'
 
 permissions:
