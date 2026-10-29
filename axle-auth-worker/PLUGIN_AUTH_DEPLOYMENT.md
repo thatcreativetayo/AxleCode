@@ -1,6 +1,6 @@
 # Axle plugin auth worker
 
-This Worker owns persistent per-installation plugin authorization for Axle Desktop. Composio is not used. GitHub keeps Axle's existing native desktop OAuth flow; Gmail, Outlook, Slack, Jira, Notion, Sentry, and Figma use their provider OAuth flows directly through this Worker. Axle account sign-in is not required to create a plugin session or connect a provider; each provider still requires its own authorization.
+This Worker owns persistent per-installation plugin authorization for Axle Desktop. Composio is not used. GitHub keeps Axle's existing native desktop OAuth flow; Gmail, Slack, Jira, Notion, Sentry, and Figma use their provider OAuth flows directly through this Worker. Axle account sign-in is not required to create a plugin session or connect a provider; each provider still requires its own authorization.
 
 The desktop renderer receives an opaque, encrypted Axle plugin-session token. When no Axle account session exists, the Worker issues an anonymous session scoped to a stable, random installation ID; session creation and validation are stateless and do not use Cloudflare KV. Provider access/refresh tokens remain encrypted at rest in Cloudflare KV and are never returned to the renderer.
 
@@ -62,7 +62,6 @@ Configure each provider application to allow the callback on the deployed Worker
 ```text
 Google sign-in: https://axle-auth.axle-download-worker.workers.dev/v1/auth/callback/google
 Gmail:   https://axle-auth.axle-download-worker.workers.dev/v1/plugins/gmail/callback
-Outlook: https://axle-auth.axle-download-worker.workers.dev/v1/plugins/outlook/callback
 Slack:   https://axle-auth.axle-download-worker.workers.dev/v1/plugins/slack/callback
 Jira:    https://axle-auth.axle-download-worker.workers.dev/v1/plugins/jira/callback
 Notion:  https://axle-auth.axle-download-worker.workers.dev/v1/plugins/notion/callback
@@ -72,6 +71,34 @@ Figma:   https://axle-auth.axle-download-worker.workers.dev/v1/plugins/figma/cal
 
 Do not register callbacks for `auth.axle.llc` (or any other custom domain) until
 that origin is attached to the Worker and its DNS resolves.
+
+### Provider app requirements
+
+Rotating a `*_CLIENT_ID` also requires updating the matching provider app. The
+Worker can only request scopes the provider app has enabled, and the provider
+rejects the authorization before the callback if its app configuration is stale.
+
+- **Slack**: add the Slack callback URL under **OAuth & Permissions → Redirect
+  URLs**, add the bot scopes the Worker requests, and install the app to the
+  workspace. `redirect_uri did not match any configured URIs` means the callback
+  is missing from that list.
+- **Jira**: use an Atlassian OAuth 2.0 (3LO) app with the Jira API scopes
+  (`read:jira-work`, `write:jira-work`, `read:jira-user`, `offline_access`).
+  The authorizing account must have access to a Jira site with admin
+  permissions, and a private app must be distributed/installed to that site.
+  `Access denied ... requires access to a Jira site` means Atlassian could not
+  find a Jira site the account can use with this app.
+- **Figma**: use a Figma **OAuth app** (not a plugin app), enable
+  `current_user:read`, `file_content:read`, `file_comments:read`, and
+  `file_comments:write` under **OAuth scopes**, then publish the app. Scope
+  changes only take effect after republishing. `Invalid scopes for app` means a
+  requested scope is not enabled on the published app.
+- **Notion**: add the callback URL to the public integration's redirect URIs.
+- **Sentry**: add the callback URL to the OAuth application; public clients use
+  PKCE and have no client secret.
+- **Gmail**: add the callback URL to the Google web OAuth client, enable the
+  Gmail API, and add the `gmail.modify` and `gmail.send` scopes to the consent
+  screen.
 
 Google is the desktop sign-in provider, and Google requires an exact redirect
 URI match. The URI must be `${PUBLIC_BASE_URL}/v1/auth/callback/google` for the

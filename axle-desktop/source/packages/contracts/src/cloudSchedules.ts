@@ -1,7 +1,13 @@
 import * as Schema from "effect/Schema";
 
 import { IsoDateTime, TrimmedNonEmptyString } from "./baseSchemas.ts";
-import { CloudEnvironmentId, CloudJob, CloudJobId, CloudSourceRevision } from "./cloudJobs.ts";
+import {
+  CloudEnvironmentId,
+  CloudJob,
+  CloudJobId,
+  CloudSourceRef,
+  CloudSourceRevision,
+} from "./cloudJobs.ts";
 import { ProviderInstanceId } from "./providerInstance.ts";
 
 const Identifier = TrimmedNonEmptyString.check(
@@ -15,10 +21,7 @@ export const CloudScheduleId = Identifier;
  * Branch, tag, or commit the schedule tracks. Branch names are resolved to a
  * commit through the control plane; a pinned commit is used as supplied.
  */
-export const CloudScheduleSourceRef = TrimmedNonEmptyString.check(
-  Schema.isMaxLength(200),
-  Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._/-]*$/),
-);
+export const CloudScheduleSourceRef = CloudSourceRef;
 
 export const CloudScheduleFrequency = Schema.Literals(["hourly", "daily", "weekly", "once"]);
 export type CloudScheduleFrequency = typeof CloudScheduleFrequency.Type;

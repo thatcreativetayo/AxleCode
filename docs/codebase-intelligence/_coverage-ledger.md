@@ -65,7 +65,7 @@ Last updated: 2026-10-13 (late evening, Africa/Lagos).
 - Tests/typecheck runs recorded in docs 10–11 (same tree, same machine, earlier in mission).
 
 ## Unresolved questions (final register)
-All open items now live in `14-open-questions-and-unknowns.md` (Q1–Q22; Q7 resolved 2026-10-18), including: canonical release repo; UI-redesign release intent; version drift cause; alchemy stub fidelity; `stream_parser.rs` per-provider formats; codex OAuth token storage; web WS reconnect policy; analytics privacy; rate limiting; orphan process reaping; SQLite journaling/busy timeout; per-turn caps; scope↔method coverage; a11y; mobile E2E; relay deployment state; other infra surfaces + `.circleci`; download worker runtime; account-api role; Windows test-failure reality; instruction/skill discovery precedence.
+All open items now live in `14-open-questions-and-unknowns.md` (Q1–Q22; Q7 resolved 2026-10-18), including: canonical release repo; UI-redesign release intent; version drift cause; alchemy stub fidelity; `stream_parser.rs` per-provider formats; web WS reconnect policy; analytics privacy; rate limiting; orphan process reaping; SQLite journaling/busy timeout; per-turn caps; scope↔method coverage; a11y; mobile E2E; relay deployment state; other infra surfaces + `.circleci`; download worker runtime; account-api role; Windows test-failure reality; instruction/skill discovery precedence.
 
 ## Method notes / lessons
 - `rg` on Windows PowerShell: exclude `-g "!node_modules" -g "!target" -g "!.git" -g "!.next"`; list `.rs` files explicitly (PowerShell globs don't expand in rg paths).

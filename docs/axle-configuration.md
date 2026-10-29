@@ -41,7 +41,6 @@ Select a provider with `--provider <id>` (short `-r`) and a model with
 | `xai` | `XAI_API_KEY` | `XAI_BASE_URL` | `https://api.x.ai/v1`; alias `grok` |
 | `ollama-cloud` | `OLLAMA_API_KEY` | `OLLAMA_CLOUD_BASE_URL` | alias `ollama_cloud` |
 | `ollama` | none | `OLLAMA_LOCAL_BASE_URL` | local daemon; `http://localhost:11434/v1` |
-| `codex` / `chatgpt` | none | — | ChatGPT Codex subscription auth via `--codex-login` |
 
 Custom OpenAI-compatible endpoints use `--provider ollama --base-url <url>`
 (keyless) or any provider id with `--base-url`. Localhost base URLs never
@@ -145,11 +144,6 @@ request-id format and the desktop's per-thread file location.
 | `--mcp-stdio-program <PROGRAM>` / `--mcp-stdio-arg <ARG>` | Local stdio MCP server (repeat `--mcp-stdio-arg`) |
 | `--github-mcp` | GitHub's hosted remote MCP server, using `GITHUB_PERSONAL_ACCESS_TOKEN` (or `GITHUB_TOKEN`) |
 
-### ChatGPT Codex subscription auth
-
-`--codex-login`, `--codex-auth-status`, `--codex-logout` manage the saved
-ChatGPT credentials used by `--provider codex`.
-
 ## Workspace files (`.axle/`)
 
 Everything Axle persists lives under the working directory's `.axle/` folder,
@@ -200,7 +194,6 @@ rejected at load time. The repository ships working examples in `.axle/agents.to
 | `AXLE_SHELL` | Shell program the `bash` tool uses (overridden by `--shell`) |
 | `AXLE_HOME` | Base directory for the global memory store (`<AXLE_HOME>/memory/memories.json`) |
 | `AXLE_MEMORY_GLOBAL_DIR` | Directory holding the global `memories.json` (wins over `AXLE_HOME`) |
-| `AXLE_CODEX_HOME` | Override the saved ChatGPT Codex auth location |
 
 ## Desktop configuration
 

@@ -87,7 +87,6 @@ const MODEL_PROVIDER_PRESENTATION_BY_LABEL: Readonly<Record<string, ModelProvide
   Claude: { label: "Claude", Icon: ClaudeAI },
   Google: { label: "Google", Icon: Gemini },
   OpenAI: { label: "OpenAI", Icon: OpenAI },
-  "OpenAI Codex": { label: "OpenAI Codex", Icon: OpenAI },
   Fireworks: { label: "Fireworks", Icon: FireworksAI },
   "Ollama Cloud": { label: "Ollama Cloud", Icon: Ollama },
   Cerebras: { label: "Cerebras", Icon: CerebrasLogo },
@@ -135,9 +134,6 @@ export function getModelProviderPresentation(
   }
   if (slug.startsWith("google/") || slug.startsWith("gemini")) {
     return MODEL_PROVIDER_PRESENTATION_BY_LABEL.Google ?? null;
-  }
-  if (slug.startsWith("openai-codex/")) {
-    return MODEL_PROVIDER_PRESENTATION_BY_LABEL["OpenAI Codex"] ?? null;
   }
   if (slug.startsWith("openai/") || slug.startsWith("gpt-")) {
     return MODEL_PROVIDER_PRESENTATION_BY_LABEL.OpenAI ?? null;

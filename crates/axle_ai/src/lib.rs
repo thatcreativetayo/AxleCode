@@ -6,6 +6,7 @@ pub mod gemini;
 pub mod openai;
 pub mod openrouter;
 pub mod provider;
+mod responses;
 pub mod retry;
 mod stream_parser;
 pub mod types;

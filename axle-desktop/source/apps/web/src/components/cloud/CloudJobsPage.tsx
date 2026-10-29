@@ -35,11 +35,27 @@ import {
   DialogTitle,
 } from "../ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../ui/empty";
-import { Input } from "../ui/input";
 import { Label } from "../ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { Spinner } from "../ui/spinner";
 import { Textarea } from "../ui/textarea";
+import {
+  CloudRepositoryField,
+  CloudSourceRefField,
+  CloudTargetFields,
+  InteractionModeField,
+  useCloudEnvironmentCatalog,
+  useGitHubBranches,
+  useGitHubRepositories,
+  type CloudEnvironmentCatalogState,
+} from "./cloudTargets";
+import {
+  defaultProviderModel,
+  hostsAllowBranchTracking,
+  isPinnedSourceRef,
+  isValidSourceRef,
+  modelsForProvider,
+  providersForEnvironment,
+} from "./cloudTargets.logic";
 
 const TERMINAL_JOB_STATES: ReadonlySet<CloudJob["state"]> = new Set([
   "completed",
@@ -101,6 +117,10 @@ function describeError(error: unknown): string {
         return "That environment is not available right now.";
       case "model_unavailable":
         return "That model is not available for cloud jobs.";
+      case "source_revision_unavailable":
+        return "That branch or tag could not be resolved to a commit. Choose another branch or paste a full commit SHA.";
+      case "invalid_source_ref":
+        return "Branch tracking requires a GitHub repository. Paste a full commit SHA instead.";
       case "event_limit_exceeded":
         return "This job produced too many events and stopped streaming.";
       case "not_found":
@@ -359,11 +379,13 @@ function ArtifactsSection({ job }: { readonly job: CloudJob }) {
 }
 function CreateJobDialog({
   client,
+  catalog,
   open,
   onOpenChange,
   onCreated,
 }: {
   readonly client: CloudJobsClient;
+  readonly catalog: CloudEnvironmentCatalogState;
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly onCreated: (job: CloudJob) => void;
@@ -378,6 +400,10 @@ function CreateJobDialog({
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const commandIdRef = useRef<string | null>(null);
+  const repositoryState = useGitHubRepositories(open);
+  const branchState = useGitHubBranches(repositoryUrl, open);
+  const selectedEnvironment =
+    catalog.environments.find((item) => item.environmentId === environmentId) ?? null;
 
   useEffect(() => {
     if (!open) return;
@@ -386,14 +412,47 @@ function CreateJobDialog({
     setSubmitError(null);
   }, [open]);
 
+  useEffect(() => {
+    if (!open || catalog.environments.length === 0) return;
+    setEnvironmentId((current) =>
+      catalog.environments.some((item) => item.environmentId === current)
+        ? current
+        : catalog.environments[0]!.environmentId,
+    );
+  }, [catalog.environments, open]);
+
+  useEffect(() => {
+    if (!open || selectedEnvironment === null) return;
+    const fallback = defaultProviderModel(selectedEnvironment);
+    setProviderInstanceId((current) =>
+      providersForEnvironment(selectedEnvironment).includes(current)
+        ? current
+        : fallback.providerInstanceId,
+    );
+  }, [open, selectedEnvironment]);
+
+  useEffect(() => {
+    if (!open || selectedEnvironment === null) return;
+    const allowedModels = modelsForProvider(selectedEnvironment, providerInstanceId);
+    setModel((current) => (allowedModels.includes(current) ? current : (allowedModels[0] ?? "")));
+  }, [open, providerInstanceId, selectedEnvironment]);
+
   const validationError = useMemo(() => {
     if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(environmentId.trim())) {
       return "Environment id must start with a letter or digit and use only letters, digits, dashes, or underscores.";
     }
     const url = repositoryUrl.trim();
     if (url.length === 0 || url.length > 2048) return "Repository URL is required.";
-    if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(sourceRevision.trim())) {
-      return "Revision must be a full 40- or 64-character lowercase hex commit SHA.";
+    const revision = sourceRevision.trim();
+    if (!isValidSourceRef(revision)) {
+      return "Choose a branch or enter a branch, tag, or full commit id without spaces.";
+    }
+    if (
+      selectedEnvironment !== null &&
+      !hostsAllowBranchTracking(selectedEnvironment.repositoryHosts) &&
+      !isPinnedSourceRef(revision)
+    ) {
+      return "This environment only supports GitHub branch tracking. Paste a full commit SHA.";
     }
     const trimmedPrompt = prompt.trim();
     if (trimmedPrompt.length === 0) return "Describe the task for the cloud agent.";
@@ -404,7 +463,15 @@ function CreateJobDialog({
     const trimmedModel = model.trim();
     if (trimmedModel.length === 0 || trimmedModel.length > 200) return "Model is required.";
     return null;
-  }, [environmentId, model, prompt, providerInstanceId, repositoryUrl, sourceRevision]);
+  }, [
+    environmentId,
+    model,
+    prompt,
+    providerInstanceId,
+    repositoryUrl,
+    selectedEnvironment,
+    sourceRevision,
+  ]);
 
   const handleSubmit = useCallback(async () => {
     if (submitting || validationError !== null) return;
@@ -465,56 +532,6 @@ function CreateJobDialog({
           </DialogDescription>
         </DialogHeader>
         <DialogPanel className="space-y-3" scrollFade={false}>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="cloud-job-environment">Environment</Label>
-              <Input
-                id="cloud-job-environment"
-                value={environmentId}
-                disabled={submitting}
-                placeholder="linux-standard"
-                onChange={(event) => setEnvironmentId(event.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="cloud-job-interaction">Interaction mode</Label>
-              <Select
-                value={interactionMode}
-                onValueChange={(value) => {
-                  if (value === "default" || value === "plan") setInteractionMode(value);
-                }}
-              >
-                <SelectTrigger id="cloud-job-interaction" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="default">Default</SelectItem>
-                  <SelectItem value="plan">Plan first</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="cloud-job-repository">Repository URL</Label>
-            <Input
-              id="cloud-job-repository"
-              value={repositoryUrl}
-              disabled={submitting}
-              placeholder="https://github.com/you/repo.git"
-              onChange={(event) => setRepositoryUrl(event.target.value)}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="cloud-job-revision">Source revision</Label>
-            <Input
-              id="cloud-job-revision"
-              value={sourceRevision}
-              disabled={submitting}
-              placeholder="Full commit SHA (40 or 64 hex characters)"
-              className="font-mono text-xs"
-              onChange={(event) => setSourceRevision(event.target.value)}
-            />
-          </div>
           <div className="space-y-1.5">
             <Label htmlFor="cloud-job-prompt">Task</Label>
             <Textarea
@@ -526,28 +543,53 @@ function CreateJobDialog({
               onChange={(event) => setPrompt(event.target.value)}
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="cloud-job-provider">Provider instance</Label>
-              <Input
-                id="cloud-job-provider"
-                value={providerInstanceId}
-                disabled={submitting}
-                placeholder="anthropic-default"
-                onChange={(event) => setProviderInstanceId(event.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="cloud-job-model">Model</Label>
-              <Input
-                id="cloud-job-model"
-                value={model}
-                disabled={submitting}
-                placeholder="claude-sonnet-4-5"
-                onChange={(event) => setModel(event.target.value)}
-              />
-            </div>
-          </div>
+          <CloudRepositoryField
+            repositoryUrl={repositoryUrl}
+            hosts={selectedEnvironment?.repositoryHosts ?? []}
+            repositories={repositoryState.repositories}
+            bridgeAvailable={repositoryState.bridgeAvailable}
+            busy={repositoryState.busy}
+            error={repositoryState.error}
+            disabled={submitting}
+            onRefresh={repositoryState.refresh}
+            onChange={(value) => {
+              setRepositoryUrl(value);
+              setSourceRevision("");
+            }}
+          />
+          <CloudSourceRefField
+            value={sourceRevision}
+            supported={branchState.supported}
+            branches={branchState.branches}
+            defaultBranch={branchState.defaultBranch}
+            busy={branchState.busy}
+            error={branchState.error}
+            disabled={submitting}
+            label="Branch or commit"
+            helper="Runs start from the latest commit on this branch. The exact commit is captured when you start the job."
+            onChange={setSourceRevision}
+          />
+          <CloudTargetFields
+            environments={catalog.environments}
+            environmentsBusy={catalog.busy}
+            environmentsError={catalog.error}
+            environmentId={environmentId}
+            providerInstanceId={providerInstanceId}
+            model={model}
+            disabled={submitting}
+            idPrefix="cloud-job"
+            onChange={(patch) => {
+              if (patch.environmentId !== undefined) setEnvironmentId(patch.environmentId);
+              if (patch.providerInstanceId !== undefined)
+                setProviderInstanceId(patch.providerInstanceId);
+              if (patch.model !== undefined) setModel(patch.model);
+            }}
+          />
+          <InteractionModeField
+            value={interactionMode}
+            disabled={submitting}
+            onChange={setInteractionMode}
+          />
           {validationError !== null ? (
             <p role="alert" className="text-xs leading-5 text-muted-foreground">
               {validationError}
@@ -596,6 +638,7 @@ export function CloudJobsPage() {
     if (accountApiUrl === null) return null;
     return new CloudJobsClient({ baseUrl: accountApiUrl, getToken: readClerkAccountToken });
   }, []);
+  const catalog = useCloudEnvironmentCatalog(client);
 
   const [phase, setPhase] = useState<"loading" | "ready" | "signed_out" | "unconfigured" | "error">(
     client === null ? "unconfigured" : "loading",
@@ -969,6 +1012,7 @@ export function CloudJobsPage() {
       </section>
       <CreateJobDialog
         client={client}
+        catalog={catalog}
         open={createOpen}
         onOpenChange={setCreateOpen}
         onCreated={handleCreated}

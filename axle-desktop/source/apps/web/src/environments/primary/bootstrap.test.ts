@@ -155,6 +155,20 @@ describe("environmentBootstrap", () => {
     });
   });
 
+  it("keeps a query string in the request path instead of encoding it into the pathname", () => {
+    vi.stubEnv("VITE_HTTP_URL", "https://remote.example.com");
+    expect(resolvePrimaryEnvironmentHttpUrl("/api/axle/usage?limit=25")).toBe(
+      "https://remote.example.com/api/axle/usage?limit=25",
+    );
+  });
+
+  it("merges explicit search params over an embedded query string", () => {
+    vi.stubEnv("VITE_HTTP_URL", "https://remote.example.com");
+    expect(
+      resolvePrimaryEnvironmentHttpUrl("/api/axle/usage?limit=25&page=2", { limit: "50" }),
+    ).toBe("https://remote.example.com/api/axle/usage?limit=50&page=2");
+  });
+
   it("uses the current origin as the descriptor base for local dev environments", async () => {
     installTestBrowser("http://localhost:5735/");
     await installDescriptorApi();

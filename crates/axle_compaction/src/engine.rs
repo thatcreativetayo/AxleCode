@@ -150,7 +150,7 @@ impl CompactionEngine {
             ..Default::default()
         };
 
-        // The ChatGPT Codex endpoint rejects non-streaming requests. Use the
+        // Some provider endpoints reject non-streaming requests. Use the
         // provider's streaming contract for summaries too, which also makes
         // compaction work consistently across providers.
         let (summary_text, saw_completion) = tokio::time::timeout(self.timeout, async {

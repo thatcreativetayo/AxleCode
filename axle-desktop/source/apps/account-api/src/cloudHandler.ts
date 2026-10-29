@@ -15,9 +15,11 @@ import { AccountAuthenticationError, type AccountPrincipal } from "./auth.ts";
 import { AccountSessionAccessError } from "./errors.ts";
 import type { CloudConfig } from "./cloudConfig.ts";
 import type { BillingConfig } from "./billingConfig.ts";
+import type { CloudRevisionResolver } from "./cloudRevision.ts";
 import type { CloudScheduleStore } from "./cloudScheduleStore.ts";
 import { CloudJobError, type CloudJobStore } from "./cloudStore.ts";
 
+const PINNED_REVISION = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 const decodeCreate = Schema.decodeUnknownSync(CloudJobCreateInput);
 const decodeSchedule = Schema.decodeUnknownSync(CloudScheduleInput);
 const decodeResponse = Schema.decodeUnknownSync(CloudJobResponseInput);
@@ -32,6 +34,8 @@ export function createCloudRequestHandler(options: {
   billing?: BillingConfig | null;
   /** Dispatches a manual run; ownership is enforced by the runner. */
   runSchedule?: ((userId: string, scheduleId: string) => Promise<CloudJob>) | null;
+  /** Resolves branch/tag job sources to the commit a worker checks out. */
+  revisions?: CloudRevisionResolver | null;
   authenticate: (request: Request) => Promise<AccountPrincipal>;
   touchSession: (principal: AccountPrincipal) => Promise<void>;
   corsOrigin: string;
@@ -113,6 +117,15 @@ export function createCloudRequestHandler(options: {
       const principal = await options.authenticate(request);
       // Preserve account revocation checks for every protected cloud operation.
       await options.touchSession(principal);
+      if (url.pathname === "/v1/cloud/environments" && request.method === "GET") {
+        return json(200, {
+          environments: config.environments.map((environment) => ({
+            environmentId: environment.environmentId,
+            repositoryHosts: environment.repositoryHosts,
+            providerModels: environment.providerModels,
+          })),
+        });
+      }
       const baseRoute = url.pathname === "/v1/cloud/jobs";
       if (url.pathname === "/v1/cloud/billing" && request.method === "GET") {
         return json(200, await store.billing(principal.userId));
@@ -154,10 +167,20 @@ export function createCloudRequestHandler(options: {
       if (baseRoute && request.method === "POST") {
         if (!config.allowedUserIds.includes(principal.userId))
           return json(403, { error: "cloud_access_denied" });
-        const result = await store.create(
-          principal.userId,
-          parse(decodeCreate, await readJson(request)),
-        );
+        const input = parse(decodeCreate, await readJson(request));
+        // Jobs always persist a pinned commit; branch and tag names are
+        // resolved once at creation so a worker never tracks a moving ref.
+        let sourceRevision = input.sourceRevision.toLowerCase();
+        if (!PINNED_REVISION.test(sourceRevision)) {
+          if (!options.revisions) throw new CloudJobError("source_revision_unavailable");
+          sourceRevision = await options.revisions.resolve(
+            input.repositoryUrl,
+            input.sourceRevision,
+          );
+          if (!PINNED_REVISION.test(sourceRevision))
+            throw new CloudJobError("source_revision_unavailable");
+        }
+        const result = await store.create(principal.userId, { ...input, sourceRevision });
         return json(result.created ? 201 : 200, result);
       }
       const route = /^\/v1\/cloud\/jobs\/([a-zA-Z0-9_-]+)(?:\/(events|cancel|responses))?$/u.exec(

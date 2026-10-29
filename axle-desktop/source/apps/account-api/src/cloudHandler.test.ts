@@ -150,11 +150,67 @@ describe("cloud HTTP authorization and routing", () => {
     ).toBe(400);
     expect(query).not.toHaveBeenCalled();
   });
-  it("requires a full commit and keeps SQL errors and secrets out of responses", async () => {
+  it("serves a safe environment catalog for job and schedule pickers", async () => {
+    const response = await request("/v1/cloud/environments");
+    expect(response?.status).toBe(200);
+    const payload = await response?.json();
+    expect(payload).toEqual({
+      environments: [
+        {
+          environmentId: "linux-test",
+          repositoryHosts: ["github.com"],
+          providerModels: [{ providerInstanceId: "axle", model: "configured-model" }],
+        },
+      ],
+    });
+    expect(JSON.stringify(payload)).not.toContain(cloudConfigFixture.workers[0]!.token);
+    expect(touchSession).toHaveBeenCalled();
+  });
+  it("rejects malformed source refs before resolving them", async () => {
     expect(
-      (await request("/v1/cloud/jobs", "POST", { ...cloudInputFixture, sourceRevision: "main" }))
-        ?.status,
+      (
+        await request("/v1/cloud/jobs", "POST", {
+          ...cloudInputFixture,
+          sourceRevision: "not a ref",
+        })
+      )?.status,
     ).toBe(400);
+  });
+  it("resolves a branch to a pinned commit before persisting the job", async () => {
+    const resolve = vi.fn(async () => "b".repeat(40));
+    handle = createCloudRequestHandler({
+      config: cloudConfigFixture,
+      store: createCloudJobStore(query, cloudConfigFixture),
+      revisions: { resolve },
+      authenticate: async () => ({ userId, sessionId: "session-a" }),
+      touchSession,
+      corsOrigin: "https://app.invalid",
+    });
+    query.mockImplementation(async (operation: string) =>
+      operation === "create" ? { job: {}, created: true } : null,
+    );
+    const response = await request("/v1/cloud/jobs", "POST", {
+      ...cloudInputFixture,
+      sourceRevision: "main",
+    });
+    expect(response?.status).toBe(201);
+    expect(resolve).toHaveBeenCalledWith(cloudInputFixture.repositoryUrl, "main");
+    expect(query).toHaveBeenCalledWith(
+      "create",
+      expect.objectContaining({
+        input: expect.objectContaining({ sourceRevision: "b".repeat(40) }),
+      }),
+    );
+  });
+  it("reports source_revision_unavailable when no GitHub resolver is configured", async () => {
+    const response = await request("/v1/cloud/jobs", "POST", {
+      ...cloudInputFixture,
+      sourceRevision: "main",
+    });
+    expect(response?.status).toBe(409);
+    expect(await response?.json()).toEqual({ error: "source_revision_unavailable" });
+  });
+  it("keeps SQL errors and secrets out of responses", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     query.mockRejectedValue(new Error("postgresql://secret:password@private-host"));
     const response = await request("/v1/cloud/jobs");

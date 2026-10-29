@@ -174,4 +174,21 @@ describe("CloudSchedulesClient", () => {
     expect(error).toBeInstanceOf(CloudJobsApiError);
     expect(error).toMatchObject({ code: "source_revision_unavailable", status: 409 });
   });
+
+  it("binds the default fetch to the global scope", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = function (this: unknown) {
+      if (this !== globalThis) throw new TypeError("Illegal invocation");
+      return Promise.resolve(jsonResponse(200, { schedules: [] }));
+    } as typeof globalThis.fetch;
+    try {
+      const client = new CloudSchedulesClient({
+        baseUrl: "https://accounts.example.com",
+        getToken: async () => "token-123",
+      });
+      await expect(client.listSchedules()).resolves.toEqual([]);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });

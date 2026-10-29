@@ -306,7 +306,11 @@ jobs:
 
   build-linux-x64:
     needs: [test-update-feeds, prepare-release]
-    runs-on: ubuntu-latest
+    # node-pty is compiled from source during install, so the runner's glibc
+    # becomes the artifact's minimum. ubuntu-latest now resolves to 26.04
+    # (glibc 2.42), which breaks the AppImage on older distros. Pin the oldest
+    # available LTS runner (glibc 2.35) to keep the Linux build portable.
+    runs-on: ubuntu-22.04
     defaults:
       run:
         working-directory: axle-desktop/source
@@ -409,6 +413,25 @@ jobs:
           test -s release/latest-linux.yml
           grep -q 'Axle-x64.AppImage' release/latest-linux.yml
           find release -maxdepth 1 -type f -printf '%f\n' | sort
+
+      - name: Verify Linux node-pty glibc baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          appimage="$PWD/release/Axle-x64.AppImage"
+          extract_dir="$RUNNER_TEMP/axle-appimage-glibc-check"
+          rm -rf "$extract_dir"
+          mkdir -p "$extract_dir"
+          (cd "$extract_dir" && "$appimage" --appimage-extract 'resources/app.asar.unpacked/node_modules/node-pty/*' >/dev/null)
+          pty="$extract_dir/squashfs-root/resources/app.asar.unpacked/node_modules/node-pty/build/Release/pty.node"
+          test -f "$pty"
+          max_glibc="$(readelf --version-info "$pty" | grep -o 'GLIBC_[0-9.]*' | sed 's/^GLIBC_//' | sort -Vu | tail -1)"
+          test -n "$max_glibc"
+          echo "node-pty requires at most glibc $max_glibc"
+          printf '%s\n%s\n' "$max_glibc" "2.35" | sort -V -C || {
+            echo "::error::node-pty requires GLIBC_$max_glibc, newer than the Ubuntu 22.04 baseline (2.35). Pin the Linux build runner to ubuntu-22.04 or rebuild node-pty against an older glibc."
+            exit 1
+          }
 
       - name: Sign Linux AppImage
         if: startsWith(github.ref, 'refs/tags/v')

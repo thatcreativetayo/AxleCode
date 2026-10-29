@@ -7,6 +7,7 @@ import type { ModelSelectorStyle } from "@axle/contracts/settings";
 import { memo, useMemo, useState, type ReactNode } from "react";
 import type { VariantProps } from "class-variance-authority";
 import { CheckIcon, ChevronDownIcon, ChevronRightIcon, ZapIcon } from "lucide-react";
+import { Badge } from "../ui/badge";
 import { Button, buttonVariants } from "../ui/button";
 import {
   Menu,
@@ -36,6 +37,8 @@ import {
   findCompactModelProviderGroup,
 } from "./compactModelPicker";
 import { usePrimarySettings } from "../../hooks/useSettings";
+import { useLockedAxleModelSlugs } from "../../entitlements/axleModelAccess";
+import { openUpgradeDialog } from "../billing/UpgradeDialog";
 import {
   getProviderFastModeState,
   getProviderTraitsPrimaryLabel,
@@ -111,6 +114,7 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
   onInstanceModelChange: (instanceId: ProviderInstanceId, model: string) => void;
 }) {
   const settings = usePrimarySettings();
+  const lockedAxleModelSlugs = useLockedAxleModelSlugs();
   const [uncontrolledIsMenuOpen, setUncontrolledIsMenuOpen] = useState(false);
   const [isAdvancedMenuOpen, setIsAdvancedMenuOpen] = useState(false);
   const isMenuOpen = props.open ?? uncontrolledIsMenuOpen;
@@ -186,17 +190,30 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
 
   const handleInstanceModelChange = (instanceId: ProviderInstanceId, model: string) => {
     if (props.disabled) return;
+    if (lockedAxleModelSlugs.has(model)) {
+      setIsMenuOpen(false);
+      openUpgradeDialog("models");
+      return;
+    }
     props.onInstanceModelChange(instanceId, model);
     setIsMenuOpen(false);
   };
 
   const selectProviderGroup = (groupId: string) => {
     const group = providerGroups.find((candidate) => candidate.id === groupId);
-    const model = group?.models.find(
-      (candidate) => !props.getModelDisabledReason?.(group.instanceId, candidate.slug),
+    if (!group) return;
+    const model = group.models.find(
+      (candidate) =>
+        !props.getModelDisabledReason?.(group.instanceId, candidate.slug) &&
+        !lockedAxleModelSlugs.has(candidate.slug),
     );
-    if (group && model) {
+    if (model) {
       handleInstanceModelChange(group.instanceId, model.slug);
+      return;
+    }
+    if (group.models.some((candidate) => lockedAxleModelSlugs.has(candidate.slug))) {
+      setIsMenuOpen(false);
+      openUpgradeDialog("models");
     }
   };
 
@@ -250,6 +267,11 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
           </TooltipTrigger>
           <TooltipPopup side="top">{displayedTriggerLabel}</TooltipPopup>
         </Tooltip>
+        {selectedModel && lockedAxleModelSlugs.has(selectedModel.slug) ? (
+          <Badge variant="secondary" size="sm">
+            Pro
+          </Badge>
+        ) : null}
       </span>
       <ChevronDownIcon aria-hidden="true" className="!ms-0 !-me-1 size-3 shrink-0 opacity-60" />
     </>
@@ -284,15 +306,12 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
             {providerGroups.map((group) => {
               const presentation = getModelProviderPresentation(group.models[0] ?? { slug: "" });
               const Icon = presentation?.Icon;
-              const hasSelectableModel = group.models.some(
-                (model) => !props.getModelDisabledReason?.(group.instanceId, model.slug),
-              );
               return (
                 <MenuRadioItem
                   key={group.id}
                   value={group.id}
                   hideIndicator
-                  disabled={!hasSelectableModel}
+                  disabled={group.models.length === 0}
                 >
                   <span className="flex min-w-0 items-center gap-2">
                     {Icon ? (
@@ -332,9 +351,13 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
             }}
           >
             {(selectedProviderGroup?.models ?? []).map((model) => {
+              const planLocked = lockedAxleModelSlugs.has(model.slug);
               const disabledReason =
                 props.getModelDisabledReason?.(selectedProviderGroup!.instanceId, model.slug) ??
                 null;
+              const lockHint =
+                disabledReason ??
+                (planLocked ? "Included with paid plans. Upgrade to use this model." : null);
               const presentation = getModelProviderPresentation(model);
               const Icon = presentation?.Icon;
               return (
@@ -343,11 +366,16 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
                   value={model.slug}
                   hideIndicator
                   disabled={Boolean(disabledReason)}
-                  title={disabledReason ?? undefined}
+                  title={lockHint ?? undefined}
                 >
                   <span className="flex min-w-0 items-center gap-2">
                     {Icon ? <Icon className="size-4 shrink-0" aria-hidden /> : null}
                     <span className="min-w-0 flex-1 truncate">{getDisplayModelName(model)}</span>
+                    {planLocked ? (
+                      <Badge variant="secondary" size="sm">
+                        Pro
+                      </Badge>
+                    ) : null}
                     {model.slug === props.model ? (
                       <CheckIcon className="size-3.5 shrink-0" aria-hidden />
                     ) : null}

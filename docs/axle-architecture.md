@@ -27,7 +27,7 @@ The desktop does not reimplement agent behavior in TypeScript. It starts one
 
 | Crate | Owns |
 | --- | --- |
-| `axle_ai` | `LlmProvider` contract, provider adapters (OpenAI, Anthropic, Gemini, OpenRouter, ChatGPT Codex), SSE parsing, provider capability metadata |
+| `axle_ai` | `LlmProvider` contract, provider adapters (OpenAI, Anthropic, Gemini, OpenRouter), SSE parsing, provider capability metadata |
 | `axle_tools` | `Tool` contract, `ToolRegistry` (timeouts, plan mode, execution modes), built-in tools, `ExecutionTarget`, MCP client (HTTP + stdio) |
 | `axle_agent` | The multi-step agent loop, parallel tool batches, approval gating, cancellation, compaction trigger, `end_task` |
 | `axle_session` | Durable session JSONL (`<cwd>/.axle/sessions/<id>.jsonl`), resume, transcript repair |

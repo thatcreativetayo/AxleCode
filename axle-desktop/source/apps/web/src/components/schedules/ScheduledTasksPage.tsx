@@ -2,6 +2,7 @@ import {
   BellRingIcon,
   CalendarClockIcon,
   ChevronRightIcon,
+  CloudIcon,
   FileSearchIcon,
   HistoryIcon,
   LoaderCircleIcon,
@@ -29,6 +30,7 @@ import { ThreadId, type ScheduledTaskList, type ServerScheduledTask } from "@axl
 import { useLocalStorage } from "../../hooks/useLocalStorage";
 import { cn } from "../../lib/utils";
 import { openUpgradeDialog } from "../billing/UpgradeDialog";
+import { CloudSchedulesPage } from "../cloud/CloudSchedulesPage";
 import { scheduledTasksLimit } from "../../entitlements/gates";
 import { useEntitlements, resolvedEntitlements } from "../../entitlements/useEntitlements";
 import {
@@ -481,6 +483,7 @@ export function ScheduledTasksPage() {
   const [importingTaskId, setImportingTaskId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<TaskFilter>("all");
+  const [activeTab, setActiveTab] = useState<"tasks" | "cloud">("tasks");
   const [suggestionCycleIndex, setSuggestionCycleIndex] = useLocalStorage(
     SCHEDULED_TASKS_SUGGESTION_CYCLE_STORAGE_KEY,
     0,
@@ -696,6 +699,90 @@ export function ScheduledTasksPage() {
     }
   };
 
+  const pageHeader = (
+    <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+      <div className="min-w-0">
+        <h1
+          id="scheduled-tasks-title"
+          className="text-2xl font-semibold tracking-tight text-foreground"
+        >
+          Scheduled tasks
+        </h1>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          {activeTab === "cloud"
+            ? "Run recurring work on Axle cloud workers, independent of this computer."
+            : "Run recurring work in your chats, with their existing model and permissions."}
+        </p>
+      </div>
+      {activeTab === "tasks" ? (
+        <Button
+          type="button"
+          data-testid="schedules-create-button"
+          size="sm"
+          className="self-start"
+          disabled={loading || targets.length === 0}
+          onClick={() => openCreateDialog()}
+        >
+          <PlusIcon className="size-3.5" />
+          Create task
+        </Button>
+      ) : null}
+    </header>
+  );
+
+  const scheduleTabs = (
+    <div
+      role="tablist"
+      aria-label="Schedule type"
+      className="mt-5 flex items-center gap-1 border-b border-border pb-3"
+    >
+      <button
+        type="button"
+        role="tab"
+        aria-selected={activeTab === "tasks"}
+        className={cn(
+          "inline-flex h-8 items-center gap-2 rounded-md px-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+          activeTab === "tasks"
+            ? "bg-muted text-foreground"
+            : "text-muted-foreground hover:bg-accent hover:text-foreground",
+        )}
+        onClick={() => setActiveTab("tasks")}
+      >
+        <CalendarClockIcon className="size-3.5" />
+        Chat tasks
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={activeTab === "cloud"}
+        className={cn(
+          "inline-flex h-8 items-center gap-2 rounded-md px-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+          activeTab === "cloud"
+            ? "bg-muted text-foreground"
+            : "text-muted-foreground hover:bg-accent hover:text-foreground",
+        )}
+        onClick={() => setActiveTab("cloud")}
+      >
+        <CloudIcon className="size-3.5" />
+        Cloud schedules
+      </button>
+    </div>
+  );
+
+  if (activeTab === "cloud") {
+    return (
+      <SidebarInset className="h-dvh min-h-0 overflow-hidden bg-background text-foreground">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
+          <div className="mx-auto w-full max-w-4xl px-5 pt-16 sm:px-8">
+            {pageHeader}
+            {scheduleTabs}
+          </div>
+          <CloudSchedulesPage embedded />
+        </div>
+      </SidebarInset>
+    );
+  }
+
   return (
     <SidebarInset className="h-dvh min-h-0 overflow-hidden bg-background text-foreground">
       <div className="relative min-h-0 flex-1 overflow-y-auto bg-background">
@@ -703,30 +790,9 @@ export function ScheduledTasksPage() {
           aria-labelledby="scheduled-tasks-title"
           className="mx-auto w-full max-w-4xl px-5 pb-12 pt-16 sm:px-8"
         >
-          <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-            <div className="min-w-0">
-              <h1
-                id="scheduled-tasks-title"
-                className="text-2xl font-semibold tracking-tight text-foreground"
-              >
-                Scheduled tasks
-              </h1>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Run recurring work in your chats, with their existing model and permissions.
-              </p>
-            </div>
-            <Button
-              type="button"
-              data-testid="schedules-create-button"
-              size="sm"
-              className="self-start"
-              disabled={loading || targets.length === 0}
-              onClick={() => openCreateDialog()}
-            >
-              <PlusIcon className="size-3.5" />
-              Create task
-            </Button>
-          </header>
+          {pageHeader}
+
+          {scheduleTabs}
 
           <p className="mt-3 text-xs leading-5 text-muted-foreground">
             Tasks run while this Axle environment is online. Missed recurring runs resume once when

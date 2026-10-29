@@ -31,7 +31,7 @@ export class CloudSchedulesClient {
 
   constructor(
     transport: CloudJobsTransport,
-    fetchImpl: typeof globalThis.fetch = globalThis.fetch,
+    fetchImpl: typeof globalThis.fetch = globalThis.fetch.bind(globalThis),
   ) {
     this.baseUrl = transport.baseUrl;
     this.getToken = transport.getToken;

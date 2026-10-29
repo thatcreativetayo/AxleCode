@@ -8,7 +8,7 @@ Part of the Axle codebase-intelligence dossier (index: `CODEBASE_INTELLIGENCE_IN
 
 | # | Integration | Direction | Owner | Status |
 | --- | --- | --- | --- | --- |
-| 1 | Model providers (OpenAI, Anthropic, Gemini, OpenRouter, Codex/ChatGPT plan) | outbound | Rust `axle_ai` | IMPLEMENTED |
+| 1 | Model providers (OpenAI, Anthropic, Gemini, OpenRouter) | outbound | Rust `axle_ai` | IMPLEMENTED |
 | 2 | Hosted web search (Exa, `https://axle.llc/search`) | outbound | Rust `axle_tools/web_search.rs` | IMPLEMENTED, no fallback provider |
 | 3 | MCP — agent as client | outbound | Rust `axle_tools/mcp.rs` | IMPLEMENTED (HTTP + stdio) |
 | 4 | MCP — server as tool provider to the agent | inbound | `apps/server/src/mcp/` | IMPLEMENTED |
@@ -21,15 +21,13 @@ Part of the Axle codebase-intelligence dossier (index: `CODEBASE_INTELLIGENCE_IN
 | 11 | Analytics + release feed (Convex) | outbound | `axle-analytics`, web | IMPLEMENTED |
 | 12 | Update distribution (download worker + update portal + electron-updater) | outbound | `axle-download-worker`, `apps/desktop/src/updates` | IMPLEMENTED; contracts frozen |
 | 13 | SSH / WSL / Tailscale remote environments | outbound | `packages/ssh`, `packages/tailscale`, desktop `src/ssh`, `src/wsl` | IMPLEMENTED |
-| 14 | Codex (ChatGPT plan) OAuth login | outbound | Rust `codex_auth.rs`; server routes `AXLE_CODEX_AUTH_ROUTE` (+`/login`, `/logout`) | IMPLEMENTED, scoped routes |
 
 ## 2. Model providers
 
-**Files:** `crates/axle_ai/src/{provider.rs,types.rs,retry.rs,openai.rs,anthropic.rs,gemini.rs,openrouter.rs,codex.rs,codex_auth.rs,stream_parser.rs}`.
+**Files:** `crates/axle_ai/src/{provider.rs,types.rs,retry.rs,openai.rs,anthropic.rs,gemini.rs,openrouter.rs,stream_parser.rs}`.
 
 - Common trait `LlmProvider` (`provider.rs:34-55`) with `complete` and `stream`; `ContentPart` includes ProviderState, which is persisted in sessions but never rendered (`types.rs`).
 - Retries: only 429/5xx, max 2 retries, 1 s→2 s→4 s capped 30 s (`retry.rs:5-18`). **[I]** No retry for stream truncation or 4xx auth errors; those surface to the loop.
-- **Codex OAuth trace:** CLI `--codex-login` → PKCE + loopback redirect against `auth.openai.com` (authorize/token/discovery, dynamic client id) → ChatGPT-plan scope check → token stored locally (location not established here; see `14`) → provider posts to `https://api.openai.com/v1/responses` (`codex.rs:145`).
 - Selection plumbing: web `settings.models` → server model options (`codexModelOptions.ts`) → argv `--provider/--model/--effort/--context-window` → runtime resolution (`main.rs:236-267`).
 
 ## 3. Web search

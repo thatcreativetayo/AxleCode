@@ -30,7 +30,9 @@ jobs:
 
   build-wsl-node-pty:
     needs: test-update-feeds
-    runs-on: ubuntu-latest
+    # This pty.node is used inside user WSL distros, so compile it against the
+    # oldest available glibc baseline instead of the current ubuntu-latest.
+    runs-on: ubuntu-22.04
     defaults:
       run:
         working-directory: axle-desktop/source
@@ -218,7 +220,9 @@ jobs:
 
   build-linux-x64:
     needs: test-update-feeds
-    runs-on: ubuntu-latest
+    # node-pty compiles from source during install; pin the glibc baseline so
+    # the AppImage/deb stay loadable on older distros (see build-macos.yml).
+    runs-on: ubuntu-22.04
     defaults:
       run:
         working-directory: axle-desktop/source

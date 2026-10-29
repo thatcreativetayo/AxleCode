@@ -4,15 +4,7 @@ import { Tool, Toolkit } from "effect/unstable/ai";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
 import * as PreviewAutomationBroker from "../../PreviewAutomationBroker.ts";
 
-const PluginId = Schema.Literals([
-  "github",
-  "jira",
-  "notion",
-  "gmail",
-  "outlook",
-  "slack",
-  "sentry",
-]);
+const PluginId = Schema.Literals(["github", "jira", "notion", "gmail", "slack", "sentry", "figma"]);
 
 const pluginSessionDependencies = [McpInvocationContext.McpInvocationContext];
 
@@ -37,7 +29,7 @@ export const RequestPluginAuthorizationTool = Tool.make("axle_request_plugin_aut
 
 export const PluginCallTool = Tool.make("axle_plugin_call", {
   description:
-    "Use one of the user's connected Axle integrations. Plugin references in the prompt are optional and do not grant access. Available integrations are GitHub, Jira, Notion, Gmail, Outlook, Slack, and Sentry; the worker rejects any integration that has not been connected. Supported actions: github=list_repositories,list_pull_requests,get_pull_request,create_issue,create_comment; jira=search_issues,get_issue,create_issue,update_issue; notion=search,get_page,create_page,update_page; gmail=search_messages,get_message,send_email,create_draft; outlook=list_messages,get_message,send_email,create_draft; slack=list_channels,read_channel,send_message; sentry=list_issues,get_issue,update_issue.",
+    "Use one of the user's connected Axle integrations. Plugin references in the prompt are optional and do not grant access. Available integrations are GitHub, Jira, Notion, Gmail, Slack, Sentry, and Figma; the worker rejects any integration that has not been connected. Supported actions: github=list_repositories,list_pull_requests,get_pull_request,create_issue,create_comment; jira=search_issues,get_issue,create_issue,update_issue; notion=search,get_page,create_page,update_page; gmail=search_messages,get_message,send_email,create_draft; slack=list_channels,read_channel,send_message; sentry=list_issues,get_issue,update_issue; figma=get_file,get_comments,post_comment.",
   parameters: Schema.Struct({
     pluginId: PluginId,
     action: Schema.String,

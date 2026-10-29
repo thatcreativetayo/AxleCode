@@ -75,6 +75,7 @@ wrangler secret put CLERK_ISSUER
 wrangler secret put CLERK_JWKS_URL
 wrangler secret put CLERK_AUDIENCE
 wrangler secret put AXLE_CLOUD_CONFIG            # JSON from docs/cloud-execution.md
+wrangler secret put AXLE_GITHUB_TOKEN            # optional: resolves branch/tag job sources on GitHub
 wrangler secret put AXLE_BILLING_CONFIG
 wrangler secret put AXLE_BACHS_API_KEY
 wrangler secret put AXLE_PRO_BACHS_PRODUCT_ID

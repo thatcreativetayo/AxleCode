@@ -4,7 +4,6 @@ import {
   BoxesIcon,
   CheckCircle2Icon,
   ChevronDownIcon,
-  LoaderCircleIcon,
   PlusIcon,
   SaveIcon,
   SearchIcon,
@@ -30,8 +29,6 @@ import {
   usePrimarySettings,
   useUpdatePrimarySettings,
 } from "../../hooks/useSettings";
-import { fetchPrimaryEnvironment } from "../../environments/primary/httpLayer";
-import { resolvePrimaryEnvironmentHttpUrl } from "../../environments/primary/target";
 import { getAppModelOptionsForInstance } from "../../modelSelection";
 import {
   applyProviderInstanceSettings,
@@ -61,46 +58,6 @@ type Logo = ComponentType<SVGProps<SVGSVGElement>>;
 
 const AXLE_INSTANCE_ID = ProviderInstanceId.make("axle");
 const AXLE_DRIVER = ProviderDriverKind.make("axle");
-const CODEX_AUTH_PATH = "/api/axle/codex-auth";
-
-type CodexAuthStatus = {
-  readonly authenticated: boolean;
-  readonly expires?: number | null;
-  readonly planUsageAuthorized: boolean;
-};
-
-async function codexAuthRequest(path = "", method = "GET"): Promise<CodexAuthStatus> {
-  const requestUrl = resolvePrimaryEnvironmentHttpUrl(`${CODEX_AUTH_PATH}${path}`);
-  let response: Response;
-  try {
-    response = await fetchPrimaryEnvironment(requestUrl, {
-      method,
-      signal: AbortSignal.timeout(path === "/login" ? 15 * 60_000 : 20_000),
-    });
-  } catch (cause) {
-    const detail = cause instanceof Error ? cause.message : String(cause);
-    throw new Error(
-      `Could not reach the local ChatGPT authentication service (${detail}). Restart the app and try again.`,
-      { cause },
-    );
-  }
-  const responseText = await response.text();
-  let payload: CodexAuthStatus & { readonly error?: string };
-  try {
-    payload = responseText
-      ? (JSON.parse(responseText) as CodexAuthStatus & { readonly error?: string })
-      : { authenticated: false, planUsageAuthorized: false };
-  } catch (cause) {
-    throw new Error(
-      `The local ChatGPT authentication service returned an invalid response (HTTP ${response.status}).`,
-      { cause },
-    );
-  }
-  if (!response.ok) {
-    throw new Error(payload.error || `ChatGPT authentication failed (HTTP ${response.status}).`);
-  }
-  return payload;
-}
 
 /**
  * Environment variable prefixes owned by the built-in providers. A user-added
@@ -221,7 +178,6 @@ const MODEL_APIS: ReadonlyArray<{
     id: "mistral",
     name: "Mistral",
     envName: "MISTRAL_API_KEY",
-    baseUrlEnvName: "MISTRAL_BASE_URL",
     placeholder: "Mistral API key",
     description: "Mistral and Codestral models through the Mistral API.",
     Logo: MistralLogo,
@@ -230,7 +186,6 @@ const MODEL_APIS: ReadonlyArray<{
     id: "deepseek",
     name: "DeepSeek",
     envName: "DEEPSEEK_API_KEY",
-    baseUrlEnvName: "DEEPSEEK_BASE_URL",
     placeholder: "sk-...",
     description: "DeepSeek chat and reasoner models through api.deepseek.com.",
     Logo: DeepSeekLogo,
@@ -239,7 +194,6 @@ const MODEL_APIS: ReadonlyArray<{
     id: "xai",
     name: "xAI",
     envName: "XAI_API_KEY",
-    baseUrlEnvName: "XAI_BASE_URL",
     placeholder: "xai-...",
     description: "Grok models through the xAI API.",
     Logo: XaiLogo,
@@ -256,9 +210,6 @@ export function ModelsSettingsPanel() {
     reportFailure: false,
   });
   const [drafts, setDrafts] = useState<Record<string, string>>({});
-  const [codexAuth, setCodexAuth] = useState<CodexAuthStatus | null>(null);
-  const [codexAuthBusy, setCodexAuthBusy] = useState(false);
-  const [codexAuthError, setCodexAuthError] = useState<string | null>(null);
   const [modelQuery, setModelQuery] = useState("");
   const [customProviderDraft, setCustomProviderDraft] = useState({
     name: "",
@@ -369,20 +320,6 @@ export function ModelsSettingsPanel() {
     setModelPreferences(settings.providerModelPreferences);
   }, [clientSettingsHydrated, settings.providerModelPreferences]);
 
-  useEffect(() => {
-    let active = true;
-    void codexAuthRequest()
-      .then((status) => {
-        if (active) setCodexAuth(status);
-      })
-      .catch((error: unknown) => {
-        if (active) setCodexAuthError(error instanceof Error ? error.message : String(error));
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
-
   const refreshAxleProvider = async () => {
     if (!primaryEnvironment) {
       throw new Error("The local provider is not connected yet. Restart the app and try again.");
@@ -394,20 +331,6 @@ export function ModelsSettingsPanel() {
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
       const error = squashAtomCommandFailure(result);
       throw error instanceof Error ? error : new Error(String(error));
-    }
-  };
-
-  const updateCodexAuthentication = async (operation: "login" | "logout") => {
-    setCodexAuthBusy(true);
-    setCodexAuthError(null);
-    try {
-      const status = await codexAuthRequest(`/${operation}`, "POST");
-      setCodexAuth(status);
-      await refreshAxleProvider();
-    } catch (error) {
-      setCodexAuthError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setCodexAuthBusy(false);
     }
   };
 
@@ -631,7 +554,7 @@ export function ModelsSettingsPanel() {
             <span className="space-y-1">
               <span className="block">Model APIs and credentials</span>
               <span className="block text-xs font-normal text-muted-foreground">
-                Manage API keys and your ChatGPT connection.
+                Manage API keys for your model providers.
               </span>
             </span>
             <ChevronDownIcon className="size-4 text-muted-foreground transition-transform group-open:rotate-180" />
@@ -665,61 +588,6 @@ export function ModelsSettingsPanel() {
                         <p className="mt-1 text-xs leading-relaxed text-muted-foreground/80">
                           {description}
                         </p>
-                        {id === "openai" ? (
-                          <div className="mt-2">
-                            <button
-                              type="button"
-                              className="inline-flex min-h-7 items-center gap-1.5 rounded-sm text-xs text-foreground underline-offset-4 outline-none transition-colors hover:underline focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-                              disabled={codexAuthBusy}
-                              onClick={() =>
-                                void updateCodexAuthentication(
-                                  codexAuth?.planUsageAuthorized ? "logout" : "login",
-                                )
-                              }
-                            >
-                              {codexAuthBusy ? (
-                                <LoaderCircleIcon className="size-3 animate-spin" />
-                              ) : codexAuth?.planUsageAuthorized ? (
-                                <CheckCircle2Icon className="size-3 text-foreground" />
-                              ) : null}
-                              {codexAuth?.authenticated && codexAuth.planUsageAuthorized
-                                ? "Disconnect ChatGPT plan"
-                                : codexAuthBusy
-                                  ? "Signing in to ChatGPT…"
-                                  : "Use your ChatGPT plan"}
-                            </button>
-                            {codexAuth?.planUsageAuthorized ? (
-                              <a
-                                href="https://chatgpt.com/#settings/usage"
-                                target="_blank"
-                                rel="noreferrer"
-                                className="ml-2 text-xs text-muted-foreground/60 underline-offset-2 hover:text-muted-foreground hover:underline"
-                              >
-                                Manage usage
-                              </a>
-                            ) : null}
-                            {codexAuth?.authenticated && !codexAuth.planUsageAuthorized ? (
-                              <button
-                                type="button"
-                                className="ml-2 text-xs text-muted-foreground/60 underline-offset-2 hover:text-muted-foreground hover:underline disabled:opacity-50"
-                                disabled={codexAuthBusy}
-                                onClick={() => void updateCodexAuthentication("logout")}
-                              >
-                                Disconnect
-                              </button>
-                            ) : null}
-                            <p className="mt-1 text-xs text-muted-foreground/65">
-                              {codexAuth?.authenticated && !codexAuth.planUsageAuthorized
-                                ? "Signed in, but ChatGPT plan usage permission was not granted."
-                                : "Uses eligible OpenAI Responses API requests from your ChatGPT plan."}
-                            </p>
-                            {codexAuthError ? (
-                              <p role="alert" className="mt-1 text-xs text-destructive">
-                                {codexAuthError}
-                              </p>
-                            ) : null}
-                          </div>
-                        ) : null}
                       </div>
                     </div>
                     <div className="flex w-full min-w-0 flex-col gap-2 lg:max-w-md lg:flex-1">

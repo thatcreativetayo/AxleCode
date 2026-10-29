@@ -166,5 +166,5 @@ export async function fetchAxleModelRates(): Promise<ReadonlyArray<AxleModelRate
 export function formatCredits(value: number): string {
   return Number.isInteger(value)
     ? String(value)
-    : value.toFixed(4).replace(/0+$/u, "").replace(/\.$/u, "");
+    : value.toFixed(2).replace(/0+$/u, "").replace(/\.$/u, "");
 }

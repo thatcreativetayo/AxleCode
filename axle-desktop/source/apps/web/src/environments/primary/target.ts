@@ -278,10 +278,20 @@ export function resolvePrimaryEnvironmentHttpUrl(
     source: primaryTarget.source,
     urlKind: "http-base-url",
   });
-  url.pathname = pathname;
+  // Callers may pass a query string with the path (e.g. "/api/x?limit=25").
+  // Splitting it out keeps the "?" as a query separator instead of letting
+  // the pathname setter encode it as "%3F".
+  const queryIndex = pathname.indexOf("?");
+  const path = queryIndex === -1 ? pathname : pathname.slice(0, queryIndex);
+  const query = queryIndex === -1 ? "" : pathname.slice(queryIndex + 1);
+  url.pathname = path;
+  const params = new URLSearchParams(query);
   if (searchParams) {
-    url.search = new URLSearchParams(searchParams).toString();
+    for (const [key, value] of Object.entries(searchParams)) {
+      params.set(key, value);
+    }
   }
+  url.search = params.toString();
   return url.toString();
 }
 

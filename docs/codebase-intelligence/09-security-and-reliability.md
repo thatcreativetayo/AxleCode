@@ -34,8 +34,8 @@ The adapter writes approval responses to a file path it controls and the Rust ru
 **Remediation:** create the file with restrictive permissions and validate ownership before trusting responses.
 
 ### SEC-6 — Provider/plugin credential storage formats — Medium — unknown
-`userdata/secrets/` is created by the launcher (`launcher.ts:53`) and desktop uses `electron-store`; Codex OAuth tokens and plugin credentials must live somewhere. **[U]** The exact storage, encryption, and permissions were not verified in this pass.
-**Verify:** trace where `codex_auth.rs` persists the token and where the auth worker/client stores plugin credentials; confirm OS-level protection (DPAPI/Keychain/libsecret) rather than plaintext JSON.
+`userdata/secrets/` is created by the launcher (`launcher.ts:53`) and desktop uses `electron-store`; plugin credentials must live somewhere. **[U]** The exact storage, encryption, and permissions were not verified in this pass.
+**Verify:** trace where the auth worker/client stores plugin credentials; confirm OS-level protection (DPAPI/Keychain/libsecret) rather than plaintext JSON.
 **Remediation:** if plaintext, move to OS keychain and document migration.
 
 ### SEC-7 — Search endpoint is env-overridable — Low — confirmed
@@ -56,7 +56,7 @@ Timeouts exist per tool (300 s default; bash self-managed), per approval, compac
 **Residual:** the raw token still sits in the spawned agent's environment, so SEC-2 remains the real exposure path; the token's own blast radius is limited to one thread/session until expiry.
 
 ### SEC-11 — No rate limiting / abuse controls on local HTTP API — Low — hypothesis
-Raw routes (codex-auth, OTLP proxy) are scope-guarded (`http.ts:196-246`) but no rate limit middleware was observed.
+Raw routes (OTLP proxy) are scope-guarded (`http.ts:196-246`) but no rate limit middleware was observed.
 **Remediation:** acceptable for loopback; required if headless exposure ships.
 
 ## Reliability

@@ -56,7 +56,7 @@ export const PLAN_DISPLAY: Record<PlanTier, PlanDisplay> = {
       "Axle Offline Compact and Standard packs",
       "Up to 50 scheduled tasks",
       "Model-assisted pull-request reviews",
-      "Cloud jobs that keep running when you are offline",
+      "Cloud schedules that run on an Axle cloud runner",
     ],
   },
   "pro-plus": {

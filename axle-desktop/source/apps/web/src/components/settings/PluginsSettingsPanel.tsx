@@ -1,16 +1,28 @@
-import { ArrowUpRightIcon, CheckIcon, LoaderCircleIcon, PlugIcon, UnplugIcon } from "lucide-react";
+import {
+  ArrowUpRightIcon,
+  CheckIcon,
+  ClockIcon,
+  LoaderCircleIcon,
+  LockIcon,
+  PlugIcon,
+  UnplugIcon,
+} from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useAccountState } from "../../account/AccountAuthProvider";
+import { pluginLockedForPlan } from "../../entitlements/gates";
+import { useEntitlements, resolvedEntitlements } from "../../entitlements/useEntitlements";
+import { openUpgradeDialog } from "../billing/UpgradeDialog";
 import { PluginLogo } from "../plugins/PluginLogo";
 import {
+  connectPlugin,
   disconnectPlugin,
   listPluginStatus,
   loadPluginSessionToken,
   type PluginStatus,
 } from "../plugins/pluginApi";
-import { getPluginById, type PluginId } from "../plugins/pluginCatalog";
+import { PLUGINS, getPluginById, type PluginId } from "../plugins/pluginCatalog";
 import { Button } from "../ui/button";
 import { SettingsPageContainer, SettingsSection } from "./settingsLayout";
 
@@ -30,6 +42,11 @@ function metadataSummary(status: PluginStatus): string | null {
 
 export function PluginsSettingsPanel() {
   const account = useAccountState();
+  const entitlements = resolvedEntitlements(useEntitlements());
+  const pluginLocked = useCallback(
+    (pluginId: PluginId) => pluginLockedForPlan(entitlements, pluginId),
+    [entitlements],
+  );
   const hasPluginSession =
     loadPluginSessionToken() !== null ||
     ((account.status === "signed-in" || account.status === "signed-out") &&
@@ -78,6 +95,42 @@ export function PluginsSettingsPanel() {
     [statuses],
   );
 
+  const connectedIds = useMemo(
+    () => new Set(statuses.filter((status) => status.connected).map((status) => status.pluginId)),
+    [statuses],
+  );
+
+  const available = useMemo(
+    () => PLUGINS.filter((plugin) => !connectedIds.has(plugin.id)),
+    [connectedIds],
+  );
+
+  const connect = useCallback(
+    async (pluginId: PluginId) => {
+      if (pluginLocked(pluginId)) {
+        openUpgradeDialog("plugins");
+        return;
+      }
+      const sessionToken = loadPluginSessionToken();
+      if (!sessionToken) {
+        setError(pluginError ?? "Your plugin session is still starting. Please try again shortly.");
+        return;
+      }
+      if (busyPluginId) return;
+      setBusyPluginId(pluginId);
+      setError(null);
+      try {
+        await connectPlugin(sessionToken, pluginId);
+        await refresh({ forceRefresh: true });
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "Plugin authorization failed.");
+      } finally {
+        setBusyPluginId(null);
+      }
+    },
+    [busyPluginId, pluginError, pluginLocked, refresh],
+  );
+
   const remove = useCallback(
     async (pluginId: PluginId) => {
       const sessionToken = loadPluginSessionToken();
@@ -119,6 +172,23 @@ export function PluginsSettingsPanel() {
           <p className="text-xs text-muted-foreground">
             {pluginError ?? "Preparing your plugin session…"}
           </p>
+        </div>
+      ) : null}
+
+      {error ? (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3"
+        >
+          <p className="min-w-0 flex-1 text-xs leading-5">{error}</p>
+          <Button
+            size="xs"
+            variant="outline"
+            disabled={isLoading}
+            onClick={() => void refresh({ forceRefresh: true })}
+          >
+            Retry
+          </Button>
         </div>
       ) : null}
 
@@ -198,22 +268,89 @@ export function PluginsSettingsPanel() {
             );
           })
         )}
-        {error ? (
-          <div
-            role="alert"
-            className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 text-sm text-foreground"
-          >
-            <p className="min-w-0 flex-1 text-xs leading-5">{error}</p>
-            <Button
-              size="xs"
-              variant="outline"
-              disabled={isLoading}
-              onClick={() => void refresh({ forceRefresh: true })}
-            >
-              Retry
-            </Button>
-          </div>
-        ) : null}
+      </SettingsSection>
+
+      <SettingsSection
+        title="Available plugins"
+        headerAction={
+          <span className="text-xs tabular-nums text-muted-foreground">{available.length}</span>
+        }
+      >
+        {available.length === 0 ? (
+          <p className="px-4 py-6 text-xs text-muted-foreground sm:px-5">
+            All available plugins are connected.
+          </p>
+        ) : (
+          available.map((plugin, index) => {
+            const inactive = plugin.inactive === true;
+            const locked = !inactive && pluginLocked(plugin.id);
+            const busy = busyPluginId === plugin.id;
+            return (
+              <div
+                key={plugin.id}
+                className={
+                  index === 0
+                    ? "flex flex-wrap items-center gap-3 px-4 py-4 sm:px-5"
+                    : "flex flex-wrap items-center gap-3 border-t border-border/70 px-4 py-4 sm:px-5"
+                }
+              >
+                <div className="grid size-10 shrink-0 place-items-center rounded-xl border border-border/70 bg-background/65">
+                  <PluginLogo pluginId={plugin.id} className="size-5 grayscale" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <p className="truncate text-sm font-medium text-foreground">{plugin.name}</p>
+                    {inactive ? (
+                      <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-border bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                        <ClockIcon className="size-3" aria-hidden />
+                        Coming soon
+                      </span>
+                    ) : locked ? (
+                      <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-border bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                        <LockIcon className="size-3" aria-hidden />
+                        Paid plans
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {inactive
+                      ? `${plugin.description} — coming soon.`
+                      : locked
+                        ? `${plugin.description} — included with paid plans.`
+                        : plugin.description}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={inactive || busyPluginId !== null || (!locked && !hasPluginSession)}
+                  className="shrink-0"
+                  aria-label={`${inactive ? "Coming soon" : locked ? "Upgrade" : "Connect"} ${plugin.name}`}
+                  onClick={() => {
+                    if (inactive) return;
+                    if (locked) {
+                      openUpgradeDialog("plugins");
+                    } else {
+                      void connect(plugin.id);
+                    }
+                  }}
+                >
+                  {busy ? (
+                    <LoaderCircleIcon className="size-3.5 animate-spin" />
+                  ) : inactive ? (
+                    <ClockIcon className="size-3.5" />
+                  ) : locked ? (
+                    <LockIcon className="size-3.5" />
+                  ) : (
+                    <PlugIcon className="size-3.5" />
+                  )}
+                  {busy ? "Connecting…" : inactive ? "Coming soon" : locked ? "Upgrade" : "Connect"}
+                </Button>
+              </div>
+            );
+          })
+        )}
       </SettingsSection>
     </SettingsPageContainer>
   );

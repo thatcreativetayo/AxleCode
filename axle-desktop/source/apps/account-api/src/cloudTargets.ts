@@ -40,11 +40,19 @@ export function validateCloudModel(
   providerInstanceId: string,
   model: string,
 ): void {
-  if (
-    !environment.providerModels.some(
-      (item) => item.providerInstanceId === providerInstanceId && item.model === model,
-    )
-  ) {
-    throw new CloudJobError("model_unavailable");
-  }
+  const configured = environment.providerModels.some(
+    (item) => item.providerInstanceId === providerInstanceId,
+  );
+  if (!configured) throw new CloudJobError("model_unavailable");
+  const exact = environment.providerModels.some(
+    (item) => item.providerInstanceId === providerInstanceId && item.model === model,
+  );
+  if (exact) return;
+  // Axle-gateway providers expose the live public catalog; the worker accepts
+  // any model the gateway serves, so only an `axle/` slug is required here.
+  const usesAxleCatalog = environment.providerModels.some(
+    (item) => item.providerInstanceId === providerInstanceId && item.model.startsWith("axle/"),
+  );
+  if (usesAxleCatalog && /^axle\/[A-Za-z0-9][A-Za-z0-9._-]*$/u.test(model)) return;
+  throw new CloudJobError("model_unavailable");
 }

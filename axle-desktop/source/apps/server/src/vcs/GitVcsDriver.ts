@@ -12,6 +12,7 @@ import { ChildProcessSpawner } from "effect/unstable/process";
 import {
   GitCommandError,
   VcsProcessExitError,
+  VcsRepositoryDetectionError,
   type VcsSwitchRefInput,
   type VcsSwitchRefResult,
   type VcsCreateRefInput,
@@ -616,11 +617,31 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
     return relativePaths.filter((relativePath) => !ignoredPaths.has(relativePath));
   });
 
-  const initRepository: VcsDriver.VcsDriver["Service"]["initRepository"] = (input) =>
-    gitCommand(vcsProcess, "GitVcsDriver.initRepository", input.cwd, ["init"], {
+  // `git init` runs through `git -C <cwd>`, which fails with exit code 128 when the
+  // target directory does not exist yet. Provision the workspace directory first so
+  // that initializing a repository for a brand-new project succeeds.
+  const initRepository: VcsDriver.VcsDriver["Service"]["initRepository"] = Effect.fn(
+    "GitVcsDriver.initRepository",
+  )(function* (input) {
+    yield* fileSystem.makeDirectory(input.cwd, { recursive: true }).pipe(
+      Effect.catchTags({
+        PlatformError: (cause) =>
+          Effect.fail(
+            new VcsRepositoryDetectionError({
+              operation: "GitVcsDriver.initRepository",
+              cwd: input.cwd,
+              detail: "Failed to create the repository directory before running git init.",
+              cause,
+            }),
+          ),
+      }),
+    );
+
+    yield* gitCommand(vcsProcess, "GitVcsDriver.initRepository", input.cwd, ["init"], {
       timeoutMs: 10_000,
       maxOutputBytes: 64 * 1024,
-    }).pipe(Effect.asVoid);
+    });
+  });
 
   const resolveHeadCommit = (cwd: string) =>
     execute({
@@ -712,14 +733,7 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
           // The isolated index must still honor normal ignore rules. The
           // explicit advice setting prevents an ignored runtime directory
           // from turning an otherwise valid snapshot into exit code 1.
-          args: [
-            "-c",
-            "advice.addIgnoredFile=false",
-            "add",
-            "-A",
-            "--",
-            ...checkpointPathspec,
-          ],
+          args: ["-c", "advice.addIgnoredFile=false", "add", "-A", "--", ...checkpointPathspec],
           env: commitEnv,
           timeoutMs: 300_000,
         });

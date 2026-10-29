@@ -632,6 +632,7 @@ it.layer(NodeServices.layer)("server settings", (it) => {
           name: "Personal MCP",
           url: "https://mcp.example.test/rpc",
           authorizationToken: "mcp-secret",
+          authorizationTokenRedacted: false,
           enabled: true,
         };
 

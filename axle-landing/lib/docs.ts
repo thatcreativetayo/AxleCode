@@ -35,7 +35,7 @@ const KEYWORDS: Record<string, string> = {
   quickstart: "first task prompt start tutorial",
   projects: "workspace folder repo repository threads history files context",
   providers:
-    "api key models openai claude anthropic gemini google ollama groq fireworks cerebras openrouter codex login",
+    "api key models openai claude anthropic gemini google ollama groq fireworks cerebras openrouter",
   approvals: "permissions read only plan mode safety allow decline",
   "remote-access": "tailscale network computer remote phone wsl",
   integrations:

@@ -1,151 +1,133 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowUpRight, Check, Minus } from "lucide-react";
+import { ArrowUpRight, Check } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/button";
 import { RevealGroup, RevealItem } from "@/components/fx/reveal";
 
-export function BillingToggle({
-  annual,
-  onChange,
-}: {
-  annual: boolean;
-  onChange: (value: boolean) => void;
-}) {
-  return (
-    <div
-      className="hairline inline-flex rounded-xl bg-[#101010] p-1"
-      role="group"
-      aria-label="Billing period"
-    >
-      {[
-        { label: "Monthly", value: false },
-        { label: "Annual", value: true },
-      ].map((option) => (
-        <button
-          type="button"
-          key={option.label}
-          aria-pressed={annual === option.value}
-          onClick={() => onChange(option.value)}
-          className={cn(
-            "min-w-[105px] rounded-lg px-5 py-2.5 text-xs transition-colors duration-[400ms] ease-premium",
-            annual === option.value
-              ? "bg-paper text-ink"
-              : "text-mute hover:text-paper",
-          )}
-        >
-          {option.label}
-        </button>
-      ))}
-    </div>
-  );
-}
+const PLANS = [
+  {
+    name: "Free",
+    price: "$0",
+    unit: "forever",
+    tagline: "Your local workspace, free to keep.",
+    badge: "Available now",
+    cta: "Get Axle",
+    highlight: false,
+    note: "Model usage billed by your provider.",
+    features: [
+      "Local projects, terminal, and Git tools",
+      "Bring your own model keys or local models",
+      "Google Gemma 4, Meta Muse Glimmer, and Nemotron 3.5 Lightning",
+      "100 Axle credits every day",
+    ],
+  },
+  {
+    name: "Pro",
+    price: "$20",
+    unit: "month",
+    tagline: "For individual work that should not wait.",
+    badge: "Most popular",
+    cta: "Get Pro",
+    highlight: true,
+    note: "Billed monthly in the app.",
+    features: [
+      "Everything in Free",
+      "GLM 5.3, GLM 5.3 Flash, and Nemotron 3 Super",
+      "2,000 Axle credits every month",
+      "Up to 50 scheduled tasks",
+      "Model-assisted pull-request reviews",
+      "Cloud schedules that run on an Axle cloud runner",
+    ],
+  },
+  {
+    name: "Pro+",
+    price: "$60",
+    unit: "month",
+    tagline: "Heavier work, longer runs, more of everything.",
+    badge: "",
+    cta: "Get Pro+",
+    highlight: false,
+    note: "Billed monthly in the app.",
+    features: [
+      "Everything in Pro",
+      "4,000 Axle credits every month",
+      "Up to 100 scheduled tasks",
+      "More concurrent cloud jobs",
+    ],
+  },
+  {
+    name: "Ultra",
+    price: "$200",
+    unit: "month",
+    tagline: "The whole engine, with the limits taken off.",
+    badge: "",
+    cta: "Get Ultra",
+    highlight: false,
+    note: "Billed monthly in the app.",
+    features: [
+      "Everything in Pro+",
+      "10,000 Axle credits every month",
+      "Up to 200 scheduled tasks",
+      "The highest cloud-job concurrency",
+    ],
+  },
+] as const;
 
-export function PricingCards({ annual }: { annual: boolean }) {
+export function PricingCards() {
   return (
-    <RevealGroup className="grid gap-4 lg:grid-cols-3">
-      <RevealItem>
-        <div className="hairline flex h-full flex-col rounded-[24px] bg-[#161616] p-7 sm:p-9">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xl tracking-tight">Free</h3>
-            <span className="rounded-full border border-white/15 px-2.5 py-1 font-mono text-[10px] text-paper">
-              Available now
-            </span>
-          </div>
-          <p className="mt-3 text-sm text-mute">
-            For your next idea and the one after.
-          </p>
+    <RevealGroup className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      {PLANS.map((plan) => (
+        <RevealItem key={plan.name} className="h-full">
           <div
-            className="mt-9 flex min-h-[61px] items-baseline gap-2"
-            aria-live="polite"
+            className={cn(
+              "hairline flex h-full flex-col rounded-[24px] p-6 sm:p-7",
+              plan.highlight
+                ? "bg-[#161616] ring-1 ring-white/15"
+                : "bg-[#101010]",
+            )}
           >
-            <span className="text-[54px] leading-none tracking-[-0.06em]">
-              $0
-            </span>
-            <span className="text-sm text-mute">
-              / {annual ? "year" : "month"}
-            </span>
-          </div>
-          <p className="mt-4 text-xs text-mute">
-            Model usage billed by your provider.
-          </p>
-          <Button href="/download" className="mt-8 w-full">
-            Get Axle <ArrowUpRight size={16} />
-          </Button>
-          <ul className="mt-8 space-y-4 border-t border-white/10 pt-7">
-            {[
-              "Your local projects and files",
-              "Bring your own model keys",
-              "Code, terminal, and Git tools",
-              "Local model support",
-              "MCP server connections",
-            ].map((feature) => (
-              <li
-                key={feature}
-                className="flex items-center gap-3 text-[13px] text-mute"
-              >
-                <Check size={15} className="shrink-0 text-paper" />
-                {feature}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </RevealItem>
-      {[
-        {
-          name: "Pro",
-          tagline: "For a more individual way to work.",
-          description:
-            "A planned offering for developers who want more from their daily workspace.",
-          focus: "Individual workflows",
-        },
-        {
-          name: "Team",
-          tagline: "For the work you build together.",
-          description:
-            "A planned offering shaped around the needs of teams building together.",
-          focus: "Shared workflows",
-        },
-      ].map((tier) => (
-        <RevealItem key={tier.name}>
-          <div className="hairline flex h-full flex-col rounded-[24px] bg-[#101010] p-7 sm:p-9">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xl tracking-tight">{tier.name}</h3>
-              <span className="rounded-full border border-white/10 px-2.5 py-1 font-mono text-[10px] text-mute">
-                Planned
-              </span>
-            </div>
-            <p className="mt-3 text-sm text-mute">{tier.tagline}</p>
-            <div className="mt-9 flex min-h-[61px] items-center">
-              <span className="text-[34px] tracking-[-0.04em]">
-                Coming soon
-              </span>
-            </div>
-            <p className="mt-4 text-xs text-mute" aria-live="polite">
-              {annual ? "Annual" : "Monthly"} pricing to be announced.
-            </p>
-            <Button
-              href="/company#contact"
-              variant="secondary"
-              className="mt-8 w-full"
-            >
-              Talk to us <ArrowUpRight size={16} />
-            </Button>
-            <p className="mt-8 min-h-20 border-t border-white/10 pt-7 text-[13px] leading-7 text-mute">
-              {tier.description}
-            </p>
-            <ul className="mt-5 space-y-4">
-              {[
-                tier.focus,
-                "Features to be announced",
-                "No paid sign-up yet",
-              ].map((feature) => (
-                <li
-                  className="flex items-center gap-3 text-[13px] text-mute"
-                  key={feature}
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-xl tracking-tight">{plan.name}</h3>
+              {plan.badge ? (
+                <span
+                  className={cn(
+                    "shrink-0 rounded-full border px-2.5 py-1 font-mono text-[10px]",
+                    plan.highlight
+                      ? "border-white/25 text-paper"
+                      : "border-white/15 text-paper",
+                  )}
                 >
-                  <Minus size={14} className="shrink-0" />
+                  {plan.badge}
+                </span>
+              ) : null}
+            </div>
+            <p className="mt-3 min-h-10 text-sm text-mute">{plan.tagline}</p>
+            <div className="mt-8 flex min-h-[61px] items-baseline gap-2">
+              <span className="text-[54px] leading-none tracking-[-0.06em]">
+                {plan.price}
+              </span>
+              <span className="text-sm text-mute">/ {plan.unit}</span>
+            </div>
+            <p className="mt-4 min-h-8 text-xs text-mute">{plan.note}</p>
+            <Button
+              href="/download"
+              variant={plan.highlight ? "primary" : "secondary"}
+              className="mt-7 w-full"
+            >
+              {plan.cta} <ArrowUpRight size={16} />
+            </Button>
+            <ul className="mt-8 space-y-4 border-t border-white/10 pt-7">
+              {plan.features.map((feature) => (
+                <li
+                  key={feature}
+                  className="flex items-start gap-3 text-[13px] leading-6 text-mute"
+                >
+                  <Check
+                    size={15}
+                    className="mt-1 shrink-0 text-paper"
+                    aria-hidden="true"
+                  />
                   {feature}
                 </li>
               ))}
@@ -154,19 +136,5 @@ export function PricingCards({ annual }: { annual: boolean }) {
         </RevealItem>
       ))}
     </RevealGroup>
-  );
-}
-
-export function PricingTeaser() {
-  const [annual, setAnnual] = useState(false);
-  return (
-    <div className="space-y-8">
-      <BillingToggle annual={annual} onChange={setAnnual} />
-      <PricingCards annual={annual} />
-      <p className="text-xs leading-6 text-mute">
-        Free is available today. Pro and Team are planned; paid prices and
-        features have not been announced.
-      </p>
-    </div>
   );
 }

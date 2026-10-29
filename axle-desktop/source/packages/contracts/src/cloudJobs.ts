@@ -15,6 +15,16 @@ export const CloudSourceRevision = Schema.String.check(
   Schema.isPattern(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/),
 );
 
+/**
+ * User-supplied branch, tag, or commit. The control plane resolves refs to a
+ * pinned commit before a job is persisted, so workers only ever see
+ * `CloudSourceRevision`.
+ */
+export const CloudSourceRef = TrimmedNonEmptyString.check(
+  Schema.isMaxLength(200),
+  Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._/-]*$/),
+);
+
 /** This describes whole-agent hosting, not Rust's per-tool ExecutionTarget. */
 export const AgentExecutionTarget = Schema.Union([
   Schema.Struct({ kind: Schema.Literal("local") }),
@@ -48,7 +58,7 @@ export const CloudJobCreateInput = Schema.Struct({
   commandId: CloudJobCommandId,
   environmentId: CloudEnvironmentId,
   repositoryUrl: TrimmedNonEmptyString.check(Schema.isMaxLength(2048)),
-  sourceRevision: CloudSourceRevision,
+  sourceRevision: CloudSourceRef,
   prompt: TrimmedNonEmptyString.check(Schema.isMaxLength(32_768)),
   providerInstanceId: ProviderInstanceId,
   model: TrimmedNonEmptyString.check(Schema.isMaxLength(200)),
@@ -67,6 +77,29 @@ export const CloudJobLimits = Schema.Struct({
   networkPolicy: Schema.Literal("restricted"),
 });
 export type CloudJobLimits = typeof CloudJobLimits.Type;
+
+export const CloudEnvironmentProviderModel = Schema.Struct({
+  providerInstanceId: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(128)),
+  model: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(200)),
+});
+export type CloudEnvironmentProviderModel = typeof CloudEnvironmentProviderModel.Type;
+
+/**
+ * Safe, client-visible projection of an operator-configured cloud
+ * environment. Worker identities, tokens, and job limits are never included.
+ */
+export const CloudEnvironmentSummary = Schema.Struct({
+  environmentId: CloudEnvironmentId,
+  repositoryHosts: Schema.Array(Schema.String),
+  providerModels: Schema.Array(CloudEnvironmentProviderModel),
+});
+export type CloudEnvironmentSummary = typeof CloudEnvironmentSummary.Type;
+
+/** `GET /v1/cloud/environments` — picker data for cloud job and schedule forms. */
+export const CloudEnvironmentCatalog = Schema.Struct({
+  environments: Schema.Array(CloudEnvironmentSummary),
+});
+export type CloudEnvironmentCatalog = typeof CloudEnvironmentCatalog.Type;
 
 export const CloudJobPendingRequest = Schema.Struct({
   requestId: Identifier,

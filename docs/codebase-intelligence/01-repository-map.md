@@ -28,10 +28,10 @@ The repository is a **two-build-world monorepo**: a Rust workspace at the root a
 
 | Crate | Role | Key files |
 | --- | --- | --- |
-| `axle_cli` | Binary entry point `axle`; flag parsing, provider/model resolution, interactive loop, `/compact`, image attachments, Codex auth subcommands | `src/main.rs` (single file; flags at 29-209, `run_text_only` at 311, context-window parser 267, Ctrl+C save 1133-1157) |
+| `axle_cli` | Binary entry point `axle`; flag parsing, provider/model resolution, interactive loop, `/compact`, image attachments | `src/main.rs` (single file; flags at 29-209, `run_text_only` at 311, context-window parser 267, Ctrl+C save 1133-1157) |
 | `axle_agent` | Agent loop, streaming turns, tool-call execution, approvals, usage accounting | `src/loop_runner.rs` (2472 lines: options 24-64, approvals 42-145, streaming turn 1916-2283, approval gating 2335-2430) |
 | `axle_tools` | Tool implementations, registry, path guard, shell execution, MCP client, plan/end-task control tools | `registry.rs`, `tool.rs`, `bash.rs`, `edit.rs`, `read.rs`, `write.rs`, `find.rs`, `grep.rs`, `ls.rs`, `memory.rs`, `plan.rs`, `mcp.rs`, `web_search.rs`, `execution.rs`, `path_guard.rs` |
-| `axle_ai` | Provider abstraction and wire clients | `provider.rs`, `types.rs`, `retry.rs`, `openai.rs`, `anthropic.rs`, `gemini.rs`, `openrouter.rs`, `codex.rs`, `codex_auth.rs`, `stream_parser.rs` |
+| `axle_ai` | Provider abstraction and wire clients | `provider.rs`, `types.rs`, `retry.rs`, `openai.rs`, `anthropic.rs`, `gemini.rs`, `openrouter.rs`, `stream_parser.rs` |
 | `axle_session` | JSONL session persistence, context building, tool-protocol repair | `manager.rs` (header 197-208, compaction trim 234-254, append 259-282, repair 371-426), `types.rs` |
 | `axle_compaction` | Context compaction engine | `engine.rs` (KEEP_RECENT_TOKENS/threshold 8-33, summarize 141-176, rewrite 184-196) |
 | `axle_prompt` | System prompt + AGENTS.md + skills assembly | `builder.rs` (skill roots 340, `build()` 475-716) |

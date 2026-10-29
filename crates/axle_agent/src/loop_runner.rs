@@ -730,7 +730,7 @@ mod tests {
                 return Ok(Box::pin(stream::iter(vec![
                     AssistantMessageEvent::TextDelta("I will remember amber-orchid.".to_string()),
                     AssistantMessageEvent::ProviderState(ContentPart::ProviderState {
-                        provider: "openai-codex".to_string(),
+                        provider: "openai".to_string(),
                         data: serde_json::json!({
                             "type": "reasoning",
                             "id": "reasoning-1",
@@ -751,7 +751,7 @@ mod tests {
                     matches!(
                         part,
                         ContentPart::ProviderState { provider, data }
-                            if provider == "openai-codex"
+                            if provider == "openai"
                                 && data["encrypted_content"] == "opaque-state"
                     )
                 })
@@ -2479,7 +2479,7 @@ impl AgentLoop {
             assistant_msg.provider = Some(self.provider.provider_name().to_string());
             assistant_msg.model = Some(self.options.model_name.clone());
             assistant_msg.content.extend(provider_state);
-            if self.provider.provider_name() != "openai-codex" && !thinking_output.is_empty() {
+            if !thinking_output.is_empty() {
                 assistant_msg.content.push(ContentPart::Thinking {
                     thinking: thinking_output,
                     signature: None,

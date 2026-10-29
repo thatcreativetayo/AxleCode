@@ -76,7 +76,7 @@ describe.sequential("primary environment HTTP layer", () => {
       },
     });
 
-    await fetchPrimaryEnvironment("http://127.0.0.1:3773/api/axle/codex-auth", {
+    await fetchPrimaryEnvironment("http://127.0.0.1:3773/api/axle/credits", {
       method: "POST",
     });
 
@@ -98,7 +98,7 @@ describe.sequential("primary environment HTTP layer", () => {
       },
     });
 
-    await fetchPrimaryEnvironment("http://127.0.0.1:3773/api/axle/codex-auth");
+    await fetchPrimaryEnvironment("http://127.0.0.1:3773/api/axle/credits");
 
     const request = new Request(fetchMock.mock.calls[0]?.[0], fetchMock.mock.calls[0]?.[1]);
     expect(request.credentials).toBe("include");

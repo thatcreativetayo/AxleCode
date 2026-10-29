@@ -1,4 +1,6 @@
 // @effect-diagnostics nodeBuiltinImport:off globalConsole:off
+import type { Db } from "mongodb";
+
 import { createAccountAuthenticator } from "./auth.ts";
 import { readBachsConfig } from "./bachsConfig.ts";
 import { createBillingRequestHandler } from "./billingHandler.ts";
@@ -13,7 +15,7 @@ import { createCloudScheduleStore } from "./cloudScheduleStore.ts";
 import { createCloudDatabase, createCloudJobStore } from "./cloudStore.ts";
 import { readGatewayCreditsConfig, type BindingFetch } from "./gateway.ts";
 import { createAccountRequestHandler, RequestValidationError } from "./handler.ts";
-import { mongoDatabase } from "./mongo.ts";
+import { createMongoConnection, type MongoConnection } from "./mongo.ts";
 
 /**
  * Cloudflare Worker entry for the account API. Reuses the same request
@@ -33,8 +35,14 @@ import { mongoDatabase } from "./mongo.ts";
  */
 export default {
   async fetch(request: Request, env: Record<string, unknown>): Promise<Response> {
+    let connection: MongoConnection | null = null;
     try {
-      const { handle } = await (ready ??= initialize(environmentRecord(env), serviceFetchers(env)));
+      connection = createMongoConnection(requireMongoUri(env));
+      const { handle } = await initialize(
+        environmentRecord(env),
+        serviceFetchers(env),
+        connection.db,
+      );
       return await handle(request);
     } catch (error) {
       if (error instanceof RequestValidationError) {
@@ -46,29 +54,27 @@ export default {
         message: error instanceof Error ? error.message : String(error),
       });
       return json(500, { error: "internal_error" });
+    } finally {
+      await connection?.client.close().catch(() => undefined);
     }
   },
   /** Cloudflare cron trigger; dispatches cloud schedules while users are offline. */
-  async scheduled(
-    _controller: unknown,
-    env: Record<string, unknown>,
-    ctx: { waitUntil(promise: Promise<unknown>): void },
-  ): Promise<void> {
+  async scheduled(_controller: unknown, env: Record<string, unknown>): Promise<void> {
+    let connection: MongoConnection | null = null;
     try {
-      const { runner } = await (ready ??= initialize(environmentRecord(env), serviceFetchers(env)));
-      if (runner) {
-        ctx.waitUntil(
-          runner.runDue().catch((error: unknown) => {
-            console.error("Cloud schedule runner failed", {
-              message: error instanceof Error ? error.message : "unknown",
-            });
-          }),
-        );
-      }
+      connection = createMongoConnection(requireMongoUri(env));
+      const { runner } = await initialize(
+        environmentRecord(env),
+        serviceFetchers(env),
+        connection.db,
+      );
+      if (runner) await runner.runDue();
     } catch (error) {
       console.error("Cloud schedule trigger failed", {
         message: error instanceof Error ? error.message : "unknown",
       });
+    } finally {
+      await connection?.client.close().catch(() => undefined);
     }
   },
 };
@@ -78,19 +84,25 @@ interface WorkerApplication {
   readonly runner: CloudScheduleRunner | null;
 }
 
-let ready: Promise<WorkerApplication> | null = null;
+/**
+ * Per-isolate caches that do not own request-scoped I/O. The Mongo client is
+ * deliberately not cached: Workers TCP sockets cannot cross requests.
+ */
+let authenticator: ReturnType<typeof createAccountAuthenticator> | null = null;
+let migrated = false;
 
 async function initialize(
   env: Readonly<Record<string, string | undefined>>,
   fetchers: { readonly gateway: BindingFetch | undefined; readonly auth: BindingFetch | undefined },
+  db: Db,
 ): Promise<WorkerApplication> {
   const config = readAccountApiConfig(env);
-  const database = createAccountDatabase(config);
-  const authenticate = createAccountAuthenticator(config, fetchers.auth);
+  const database = createAccountDatabase(config, db);
+  const authenticate = (authenticator ??= createAccountAuthenticator(config, fetchers.auth));
   const cloudConfig = readCloudConfig(env);
   const billingConfig = readBillingConfig(env);
   const bachsConfig = readBachsConfig(env);
-  const cloudDatabase = cloudConfig ? createCloudDatabase(mongoDatabase(config.mongodbUri)) : null;
+  const cloudDatabase = cloudConfig ? createCloudDatabase(db) : null;
   const cloudStore =
     cloudConfig && cloudDatabase
       ? createCloudJobStore(cloudDatabase.query, cloudConfig, billingConfig)
@@ -99,14 +111,15 @@ async function initialize(
     cloudConfig && cloudDatabase
       ? createCloudScheduleStore(cloudDatabase.query, cloudConfig, billingConfig)
       : null;
+  const cloudRevisions = createCloudRevisionResolver({
+    githubToken: env.AXLE_GITHUB_TOKEN ?? null,
+  });
   const scheduleRunner =
     cloudStore && cloudScheduleStore
       ? createCloudScheduleRunner({
           schedules: cloudScheduleStore,
           jobs: cloudStore,
-          revisions: createCloudRevisionResolver({
-            githubToken: env.AXLE_GITHUB_TOKEN ?? null,
-          }),
+          revisions: cloudRevisions,
           log: (message, detail) => console.error(message, detail),
         })
       : null;
@@ -115,6 +128,7 @@ async function initialize(
     billing: billingConfig,
     store: cloudStore,
     schedules: cloudScheduleStore,
+    revisions: cloudRevisions,
     runSchedule: scheduleRunner
       ? (userId, scheduleId) => scheduleRunner.runNow(userId, scheduleId)
       : null,
@@ -138,8 +152,11 @@ async function initialize(
     corsOrigin: config.corsOrigin,
   });
 
-  await database.migrate();
-  await cloudDatabase?.migrate();
+  if (!migrated) {
+    await database.migrate();
+    await cloudDatabase?.migrate();
+    migrated = true;
+  }
 
   return {
     handle: async (request) =>
@@ -148,6 +165,14 @@ async function initialize(
       (await handleRequest(request)),
     runner: scheduleRunner,
   };
+}
+
+function requireMongoUri(env: Record<string, unknown>): string {
+  const uri = env.MONGODB_URI;
+  if (typeof uri !== "string" || uri.trim().length === 0) {
+    throw new Error("MONGODB_URI is not configured.");
+  }
+  return uri;
 }
 
 function environmentRecord(

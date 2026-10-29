@@ -1,17 +1,11 @@
-export type PluginId =
-  | "github"
-  | "jira"
-  | "notion"
-  | "gmail"
-  | "outlook"
-  | "slack"
-  | "sentry";
+export type PluginId = "github" | "jira" | "notion" | "gmail" | "slack" | "sentry" | "figma";
 
 export interface PluginDefinition {
   readonly id: PluginId;
   readonly name: string;
   readonly description: string;
   readonly keywords: readonly string[];
+  readonly inactive?: boolean;
 }
 
 export const PLUGINS: readonly PluginDefinition[] = [
@@ -38,12 +32,7 @@ export const PLUGINS: readonly PluginDefinition[] = [
     name: "Gmail",
     description: "Read, draft, and send email",
     keywords: ["google", "email", "inbox", "message"],
-  },
-  {
-    id: "outlook",
-    name: "Outlook",
-    description: "Read, draft, and send Microsoft email",
-    keywords: ["microsoft", "email", "inbox", "message"],
+    inactive: true,
   },
   {
     id: "slack",
@@ -57,8 +46,12 @@ export const PLUGINS: readonly PluginDefinition[] = [
     description: "Inspect and update application issues",
     keywords: ["errors", "issues", "monitoring", "observability"],
   },
-  // Figma is intentionally retired from the desktop catalog. Re-enable it here
-  // with its PluginId member when the OAuth integration is ready again.
+  {
+    id: "figma",
+    name: "Figma",
+    description: "Read design files and collaborate on comments",
+    keywords: ["design", "file", "comments", "prototype"],
+  },
 ] as const;
 
 export const PLUGIN_TOKEN_PREFIX = "@plugin:";
@@ -82,15 +75,22 @@ export function replacePluginTokensWithNames(text: string): string {
 }
 
 export function searchPlugins(query: string): PluginDefinition[] {
-  const normalizedQuery = query.trim().toLocaleLowerCase().replace(/[.,!?;:)\]}]+$/u, "");
-  return PLUGINS.filter((plugin) => matchesPlugin(plugin, normalizedQuery)).sort((left, right) => {
+  const normalizedQuery = query
+    .trim()
+    .toLocaleLowerCase()
+    .replace(/[.,!?;:)\]}]+$/u, "");
+  return PLUGINS.filter(
+    (plugin) => !plugin.inactive && matchesPlugin(plugin, normalizedQuery),
+  ).sort((left, right) => {
     const rank = (plugin: PluginDefinition) => {
       if (!normalizedQuery) return 0;
       const name = plugin.name.toLocaleLowerCase();
       if (name === normalizedQuery) return 0;
       if (name.startsWith(normalizedQuery)) return 1;
       if (name.includes(normalizedQuery)) return 2;
-      return plugin.keywords.some((keyword) => keyword.toLocaleLowerCase().startsWith(normalizedQuery))
+      return plugin.keywords.some((keyword) =>
+        keyword.toLocaleLowerCase().startsWith(normalizedQuery),
+      )
         ? 3
         : 4;
     };

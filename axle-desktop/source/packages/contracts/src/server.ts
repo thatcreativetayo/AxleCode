@@ -67,9 +67,8 @@ export const ServerProviderModel = Schema.Struct({
   isDefault: Schema.optional(Schema.Boolean),
   /**
    * Provenance for a reported context-window capability. Provider metadata is
-   * authoritative; `oauth` is an account-aware fallback when ChatGPT OAuth
-   * metadata lacks an entitlement-specific limit, while Models.dev is
-   * explicitly unverified.
+   * authoritative; `oauth` is a legacy account-aware source retained for
+   * persisted selections, while Models.dev is explicitly unverified.
    */
   contextWindowSource: Schema.optional(Schema.Literals(["provider", "oauth", "models.dev"])),
   capabilities: Schema.NullOr(ModelCapabilities),

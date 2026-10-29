@@ -75,19 +75,25 @@ All worker requests are `POST`, authenticated with `Authorization: Bearer <worke
 
 Authenticated with the user's session; `cloud_access_denied` (403) when the user is not in `allowedUserIds`.
 
-| Route                                             | Purpose                                                |
-| ------------------------------------------------- | ------------------------------------------------------ |
-| `POST /v1/cloud/jobs`                             | Create a job (`201` created, `200` idempotent replay). |
-| `GET /v1/cloud/jobs`                              | List the user's jobs.                                  |
-| `GET /v1/cloud/jobs/{jobId}`                      | Current job state and result summary.                  |
-| `GET /v1/cloud/jobs/{jobId}/events?after=&limit=` | Event log (cursor paginated; default 200, max 500).    |
-| `POST /v1/cloud/jobs/{jobId}/responses`           | Answer an approval or input request.                   |
-| `POST /v1/cloud/jobs/{jobId}/cancel`              | Request cancellation.                                  |
-| `GET /v1/cloud/schedules`                         | List the caller's schedules.                           |
-| `POST /v1/cloud/schedules`                        | Create or update a schedule (upsert by `scheduleId`).  |
-| `DELETE /v1/cloud/schedules/{scheduleId}`         | Delete a schedule; returns `{ deleted }`.              |
-| `GET /v1/cloud/schedules/{scheduleId}/runs`       | Jobs dispatched by the schedule, newest first.         |
-| `POST /v1/cloud/schedules/{scheduleId}/run`       | Dispatch a manual run now.                             |
+| Route                                             | Purpose                                                               |
+| ------------------------------------------------- | --------------------------------------------------------------------- |
+| `GET /v1/cloud/environments`                      | Environments and their allowed provider/model pairs for client forms. |
+| `POST /v1/cloud/jobs`                             | Create a job (`201` created, `200` idempotent replay).                |
+| `GET /v1/cloud/jobs`                              | List the user's jobs.                                                 |
+| `GET /v1/cloud/jobs/{jobId}`                      | Current job state and result summary.                                 |
+| `GET /v1/cloud/jobs/{jobId}/events?after=&limit=` | Event log (cursor paginated; default 200, max 500).                   |
+| `POST /v1/cloud/jobs/{jobId}/responses`           | Answer an approval or input request.                                  |
+| `POST /v1/cloud/jobs/{jobId}/cancel`              | Request cancellation.                                                 |
+| `GET /v1/cloud/schedules`                         | List the caller's schedules.                                          |
+| `POST /v1/cloud/schedules`                        | Create or update a schedule (upsert by `scheduleId`).                 |
+| `DELETE /v1/cloud/schedules/{scheduleId}`         | Delete a schedule; returns `{ deleted }`.                             |
+| `GET /v1/cloud/schedules/{scheduleId}/runs`       | Jobs dispatched by the schedule, newest first.                        |
+| `POST /v1/cloud/schedules/{scheduleId}/run`       | Dispatch a manual run now.                                            |
+
+`POST /v1/cloud/jobs` also accepts a branch, tag, or commit as `sourceRevision`. Branch and tag
+refs are resolved to a pinned commit through the control plane before the job is persisted, so a
+worker always checks out an immutable commit. Repositories outside `github.com` must send a full
+commit id.
 
 ### Cloud schedules
 
@@ -95,7 +101,7 @@ A cloud schedule is self-contained: it stores the repository, branch, prompt, pr
 
 - **Timing** — `hourly`, `daily` (`time` + IANA `timezone`), `weekly` (`weekday` + `time` + `timezone`), or `once` (`runAt`). `nextRunAt` is computed from the schedule, and inactive schedules have `nextRunAt: null`.
 - **Full-access execution** — scheduled jobs are dispatched with `runtimeMode: "full-access"`, so the CLI runs without an approval file and no approval round trip. Creating the schedule is the consent; interactive jobs remain `approval-required`.
-- **Revision pinning** — a 40/64-character hex `sourceRef` is used as-is. Branch and tag names are resolved to a commit through the GitHub commits API at dispatch time (`AXLE_GITHUB_TOKEN` raises rate limits and is required for private-repository metadata, though clones stay credential-free). Repositories on other hosts must pin a commit id.
+- **Revision pinning** — a 40/64-character hex `sourceRef` is used as-is. Branch and tag names are resolved to a commit through the GitHub commits API at dispatch time. Branch and tag names are resolved to a commit through the GitHub commits API at dispatch time (`AXLE_GITHUB_TOKEN` raises rate limits and is required for private-repository metadata, though clones stay credential-free). Repositories on other hosts must pin a commit id.
 - **Dispatch** — the control plane checks for due schedules at startup and every 30 seconds; the Cloudflare worker additionally runs the `* * * * *` cron. A slot is claimed with a compare-and-swap on `nextRunAt` before dispatch, so multiple timers never double-run a slot. Slots missed while the control plane is offline are skipped, not backfilled.
 - **Runs** — dispatched jobs carry `scheduleId` and appear under `/runs`. Scheduled command ids derive from `scheduleId` + slot, making dispatch retries idempotent; manual runs use a unique command id.
 - **Limits** — creating schedules requires `cloudJobsEnabled` (`cloud_not_entitled`) and membership in `allowedUserIds`; active schedules are capped by the plan's `scheduledTasksMax` (`schedule_limit_reached`).

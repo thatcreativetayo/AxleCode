@@ -5,7 +5,7 @@ export const MODEL_PROVIDERS = [
     mark: "O",
     family: "GPT & reasoning models",
     type: "Cloud",
-    copy: "Work with OpenAI models using your API key, or connect your Codex subscription.",
+    copy: "Work with OpenAI models using your API key.",
     key: "OPENAI_API_KEY",
   },
   {
@@ -251,23 +251,23 @@ export const INTEGRATION_CATALOG = [
 export const PRICING_FAQS = [
   {
     q: "What do I pay for today?",
-    a: "The desktop application is free to download. When you connect a paid model provider, that provider bills your API usage under your own account. Local models use your hardware instead.",
+    a: "The desktop app is free to download and use with your own model keys. Pro is $20 per month, Pro+ is $60 per month, and Ultra is $200 per month, billed monthly in the app. If you connect your own model provider, that provider bills your API usage separately.",
   },
   {
     q: "Do I need a credit card to try Axle?",
-    a: "Axle does not ask for a credit card to download the app. A hosted model provider may require billing to be enabled before its API can be used. You can also connect a local Ollama runtime.",
+    a: "Axle does not ask for a credit card to download the app or use the Free plan. A credit card is required when you subscribe to a paid plan in the app. A hosted model provider may also require billing to be enabled before its API can be used.",
   },
   {
-    q: "Can I subscribe to Pro or Team?",
-    a: "Pro and Team are planned offerings. Paid prices, included features, and billing terms are not published yet. There is no paid checkout on this site. The free desktop app is available now.",
+    q: "Can I subscribe to a paid plan?",
+    a: "Yes. Pro, Pro+, and Ultra are available as monthly subscriptions from Settings > Billing in the Axle desktop app. The app shows the price and billing terms before checkout.",
   },
   {
-    q: "Does annual billing change my provider costs?",
-    a: "No. Your model provider charges are separate from Axle. Switching the billing view here does not change your provider account or create a subscription.",
+    q: "What do the paid plans include?",
+    a: "Paid plans add cloud jobs, cloud schedules on an Axle cloud runner, monthly Axle credits, higher concurrency, and model-assisted pull-request reviews. Each plan builds on the one before it.",
   },
   {
     q: "Can I use my existing model accounts?",
-    a: "Yes. Add provider API keys in Settings > Models. The runtime also supports Codex subscription authentication. Which models you can use depends on the access available in that account.",
+    a: "Yes. Add provider API keys in Settings > Models. Which models you can use depends on the access available in that account.",
   },
   {
     q: "Can I connect a provider that is not listed?",

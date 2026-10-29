@@ -86,7 +86,7 @@ Two exceptions are kept on purpose and are isolated in this document:
 
 | Legacy identifier | Kind | Where | Covered by |
 | --- | --- | --- | --- |
-| `RIVET_HOME`, `SPARKY_HOME`, `RIVET_CODEX_HOME`, `SPARKY_CODEX_HOME`, `RIVET_MEMORY_GLOBAL_DIR`, `SPARKY_MEMORY_GLOBAL_DIR` | environment variables | Read as fallbacks when the `AXLE_*` equivalent is unset: `crates/axle_memory/src/lib.rs`, `crates/axle_ai/src/codex_auth.rs`, `apps/server/src/memoryStore.ts`, `apps/server/src/launcher.ts` | Rust unit tests, `memoryStore.test.ts`, `launcher.test.ts` |
+| `RIVET_HOME`, `SPARKY_HOME`, `RIVET_MEMORY_GLOBAL_DIR`, `SPARKY_MEMORY_GLOBAL_DIR` | environment variables | Read as fallbacks when the `AXLE_*` equivalent is unset: `crates/axle_memory/src/lib.rs`, `apps/server/src/memoryStore.ts`, `apps/server/src/launcher.ts` | Rust unit tests, `memoryStore.test.ts`, `launcher.test.ts` |
 | `.rivet/`, `.sparky/` project dirs (memory, sessions, `agents.toml`, skills) | on-disk state | Read fallbacks in `crates/axle_memory` (`LEGACY_PROJECT_DIRS`), `crates/axle_session` (`LEGACY_STATE_DIRS`), `crates/axle_config` (`LEGACY_AGENT_PROFILES_RELATIVE_PATHS`), `crates/axle_prompt` (skill roots), `apps/server/src/memoryStore.ts` (legacy project files) | Rust unit tests, `memoryStore.test.ts` |
 | `.Rivet/`, `.sparky-desktop/` home dirs, `Rivet`/`Sparky` app-data dirs | desktop homes | Reused only when the newest Axle home has no state: `apps/server/src/launcher.ts`, `apps/server/src/memoryStore.ts` | `launcher.test.ts` |
 | `rivet`, `Sparky (Alpha)` (and dev-line variants) user-data dirs | Electron userData | Probed in order; the newest existing legacy profile wins: `apps/desktop/src/app/DesktopEnvironment.ts` | `DesktopAppIdentity.test.ts` |

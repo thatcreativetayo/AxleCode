@@ -40,7 +40,7 @@ flowchart TB
     PROMPT["axle_prompt builder<br/>AGENTS.md + skills"]
     SESS["axle_session JSONL<br/>&lt;cwd&gt;/.axle/sessions/"]
     COMP["axle_compaction engine"]
-    AICLIENT["axle_ai providers<br/>OpenAI/Anthropic/Gemini/OpenRouter/Codex"]
+    AICLIENT["axle_ai providers<br/>OpenAI/Anthropic/Gemini/OpenRouter"]
   end
 
   subgraph Cloud["Edge services"]

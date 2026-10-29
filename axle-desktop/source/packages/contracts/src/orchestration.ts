@@ -772,6 +772,7 @@ const ThreadMessageAssistantCompleteCommand = Schema.Struct({
   threadId: ThreadId,
   messageId: MessageId,
   turnId: Schema.optional(TurnId),
+  text: Schema.optional(Schema.String),
   createdAt: IsoDateTime,
 });
 

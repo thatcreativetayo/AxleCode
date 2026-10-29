@@ -1,36 +1,34 @@
-"use client";
-
-import { useState } from "react";
 import { Section, SectionHead } from "@/components/site/section";
-import { BillingToggle, PricingCards } from "@/components/site/pricing-card";
+import { PricingCards } from "@/components/site/pricing-card";
 import { ComparisonTable } from "@/components/site/comparison";
 import { Accordion } from "@/components/site/accordion";
 import { Reveal } from "@/components/fx/reveal";
 import { PRICING_FAQS } from "@/lib/catalog";
 
 export function PricingBody() {
-  const [annual, setAnnual] = useState(false);
   return (
     <>
       <Section className="!pt-5">
         <div className="mb-8 flex flex-wrap items-center justify-between gap-5">
-          <BillingToggle annual={annual} onChange={setAnnual} />
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-mute">
+            Plans &amp; billing
+          </p>
           <p className="text-xs text-mute">
             Start free. No Axle credit card required.
           </p>
         </div>
-        <PricingCards annual={annual} />
+        <PricingCards />
         <p className="mt-7 max-w-3xl text-xs leading-6 text-mute">
-          Free is available today. Pro and Team are planned offerings. Paid
-          prices, features, and billing terms will be announced before sign-up
-          opens.
+          Free is available today. Pro, Pro+, and Ultra are available as
+          monthly subscriptions in the app. Prices shown are monthly and are
+          confirmed before checkout.
         </p>
       </Section>
       <Section divider>
         <SectionHead
           eyebrow="All the details"
           title="Know what you're getting."
-          copy="The core workspace is available today. Future paid plans will be described here when their details are ready."
+          copy="The core workspace is free. Paid plans add cloud runs, monthly credits, and higher limits."
         />
         <Reveal className="mt-12">
           <ComparisonTable />

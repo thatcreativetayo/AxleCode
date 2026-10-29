@@ -27,9 +27,8 @@ describe("isModelInAxleCatalog", () => {
     expect(isModelInAxleCatalog("catalog:OpenAI", "Axle")).toBe(false);
   });
 
-  it("shows both OpenAI API and ChatGPT subscription models in the OpenAI catalog", () => {
+  it("shows OpenAI API models in the OpenAI catalog", () => {
     expect(isModelInAxleCatalog("catalog:OpenAI", "OpenAI")).toBe(true);
-    expect(isModelInAxleCatalog("catalog:OpenAI", "OpenAI Codex")).toBe(true);
   });
 
   it("keeps other providers out of the OpenAI catalog", () => {

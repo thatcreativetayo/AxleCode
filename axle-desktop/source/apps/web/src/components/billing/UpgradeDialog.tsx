@@ -1,4 +1,4 @@
-import { ArrowUpRightIcon, CheckIcon, LoaderCircleIcon, SparklesIcon } from "lucide-react";
+import { SparklesIcon } from "lucide-react";
 import { useCallback, useState, useSyncExternalStore } from "react";
 import { CloudJobsClient } from "@axle/client-runtime/cloud/jobs";
 
@@ -7,16 +7,13 @@ import { readClerkAccountToken } from "../../account/clerkRuntime";
 import { useAccountSnapshot } from "../../account/useAccountSnapshot";
 import { resolveCloudPublicConfig } from "../../cloud/publicConfig";
 import {
-  PLAN_DISPLAY,
   PLAN_ORDER,
   planTierFromId,
   resolvePricingUrl,
   type PlanTier,
 } from "../../entitlements/planCatalog";
 import { useEntitlements, resolvedEntitlements } from "../../entitlements/useEntitlements";
-import { cn } from "../../lib/utils";
-import { Badge } from "../ui/badge";
-import { Button } from "../ui/button";
+import { PlanCard } from "./PlanPackages";
 import {
   Dialog,
   DialogDescription,
@@ -27,6 +24,7 @@ import {
 } from "../ui/dialog";
 
 export type UpgradeReason =
+  | "models"
   | "cloud-jobs"
   | "schedules"
   | "pull-request-reviews"
@@ -35,6 +33,11 @@ export type UpgradeReason =
 
 const REASON_COPY: Record<UpgradeReason, { readonly title: string; readonly description: string }> =
   {
+    models: {
+      title: "This model is included with paid plans",
+      description:
+        "Paid plans unlock GLM 5.3, GLM 5.3 Flash, and Nemotron 3 Super, along with monthly credits, cloud jobs, and higher scheduled-task limits.",
+    },
     "cloud-jobs": {
       title: "Cloud jobs are part of paid plans",
       description:
@@ -138,90 +141,6 @@ export async function startCreditsCheckout(options: {
     ...(options.email !== null ? { email: options.email } : {}),
   });
   openExternalUrl(session.checkoutUrl);
-}
-
-function planRank(tier: PlanTier): number {
-  return PLAN_ORDER.indexOf(tier);
-}
-
-function PlanCard({
-  tier,
-  currentPlan,
-  actionDisabled,
-  busy,
-  onAction,
-}: {
-  readonly tier: PlanTier;
-  readonly currentPlan: PlanTier | null;
-  readonly actionDisabled: boolean;
-  readonly busy: boolean;
-  readonly onAction: () => void;
-}) {
-  const plan = PLAN_DISPLAY[tier];
-  const isCurrent = currentPlan === tier;
-  const isPaid = tier !== "free";
-  const actionLabel =
-    tier === "free"
-      ? "Stay on Free"
-      : currentPlan !== null && planRank(tier) < planRank(currentPlan)
-        ? `Switch to ${plan.name}`
-        : `Upgrade to ${plan.name}`;
-
-  return (
-    <div
-      className={cn(
-        "flex flex-col rounded-2xl border border-border bg-card/40 p-5",
-        isCurrent && "border-ring/60 bg-accent/20",
-      )}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-foreground">{plan.name}</h3>
-        {isCurrent ? (
-          <Badge variant="outline" size="sm">
-            Current plan
-          </Badge>
-        ) : null}
-      </div>
-      <div className="mt-3 flex items-baseline gap-1.5">
-        <span className="text-2xl font-semibold tracking-tight text-foreground">{plan.price}</span>
-        <span className="text-[11px] text-muted-foreground">{plan.priceUnit}</span>
-      </div>
-      <p className="mt-1.5 text-xs leading-5 text-muted-foreground">{plan.tagline}</p>
-      <ul className="mt-4 space-y-2">
-        {plan.highlights.map((highlight) => (
-          <li
-            key={highlight}
-            className="flex items-start gap-2 text-xs leading-5 text-foreground/85"
-          >
-            <CheckIcon className="mt-0.5 size-3.5 shrink-0 text-foreground/60" />
-            {highlight}
-          </li>
-        ))}
-      </ul>
-      <div className="mt-auto pt-5">
-        {isCurrent ? (
-          <Button variant="outline" size="sm" className="w-full" disabled>
-            Current plan
-          </Button>
-        ) : (
-          <Button
-            variant={isPaid ? "default" : "outline"}
-            size="sm"
-            className="w-full"
-            disabled={busy || (isPaid && actionDisabled)}
-            onClick={onAction}
-          >
-            {busy ? (
-              <LoaderCircleIcon className="size-3.5 animate-spin" />
-            ) : isPaid ? (
-              <ArrowUpRightIcon className="size-3.5" />
-            ) : null}
-            {actionLabel}
-          </Button>
-        )}
-      </div>
-    </div>
-  );
 }
 
 /** Renders once at the app root; opened through `openUpgradeDialog`. */

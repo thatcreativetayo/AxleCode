@@ -176,12 +176,12 @@ describe("searchPlugins", () => {
     expect(searchPlugins("notio").map((plugin) => plugin.id)).toEqual(["notion"]);
   });
 
-  it("ranks name matches ahead of keyword matches", () => {
-    expect(searchPlugins("mail").map((plugin) => plugin.id)).toEqual(["gmail", "outlook"]);
+  it("excludes inactive plugins from autocomplete results", () => {
+    expect(searchPlugins("mail")).toEqual([]);
   });
 
   it("ignores sentence punctuation while searching", () => {
-    expect(searchPlugins("gmail?").map((plugin) => plugin.id)).toEqual(["gmail"]);
+    expect(searchPlugins("notio?").map((plugin) => plugin.id)).toEqual(["notion"]);
   });
 });
 

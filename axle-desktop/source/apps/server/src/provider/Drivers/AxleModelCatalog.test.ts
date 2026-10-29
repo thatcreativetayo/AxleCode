@@ -822,7 +822,7 @@ describe("discoverAxleModels", () => {
 
   it("discovers OpenRouter as an OpenAI-compatible provider", async () => {
     const requests: string[] = [];
-    const fetchImplementation = (async (input: RequestInfo | URL) => {
+    const fetchImplementation = (async (input: string | URL | Request) => {
       const url = String(input);
       requests.push(url);
       if (url === "https://openrouter.ai/api/v1/models") {

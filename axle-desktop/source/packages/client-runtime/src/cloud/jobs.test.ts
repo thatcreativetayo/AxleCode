@@ -105,6 +105,29 @@ describe("CloudJobsClient", () => {
     expect(jobs[0]?.state).toBe("queued");
   });
 
+  it("lists the environment catalog used by pickers", async () => {
+    const { client, calls } = createClient({
+      handle: () =>
+        jsonResponse(200, {
+          environments: [
+            {
+              environmentId: "linux-standard",
+              repositoryHosts: ["github.com"],
+              providerModels: [
+                { providerInstanceId: "anthropic-default", model: "claude-sonnet-4-5" },
+              ],
+            },
+          ],
+        }),
+    });
+    const environments = await client.listEnvironments();
+    expect(calls[0]?.url).toBe("https://accounts.example.com/v1/cloud/environments");
+    expect(calls[0]?.init?.method).toBe("GET");
+    expect(environments[0]?.environmentId).toBe("linux-standard");
+    expect(environments[0]?.repositoryHosts).toEqual(["github.com"]);
+    expect(environments[0]?.providerModels[0]?.model).toBe("claude-sonnet-4-5");
+  });
+
   it("gets a single job by encoded id", async () => {
     const { client, calls } = createClient({
       handle: () => jsonResponse(200, sampleJob),
@@ -283,5 +306,22 @@ describe("CloudJobsClient", () => {
 
   it("still decodes fixtures through the contract schema", () => {
     expect(Schema.decodeUnknownSync(CloudJob)(sampleJob).jobId).toBe("job-1");
+  });
+
+  it("binds the default fetch to the global scope", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = function (this: unknown) {
+      if (this !== globalThis) throw new TypeError("Illegal invocation");
+      return Promise.resolve(jsonResponse(200, { jobs: [] }));
+    } as typeof globalThis.fetch;
+    try {
+      const client = new CloudJobsClient({
+        baseUrl: "https://accounts.example.com",
+        getToken: async () => "token-123",
+      });
+      await expect(client.listJobs()).resolves.toEqual([]);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });

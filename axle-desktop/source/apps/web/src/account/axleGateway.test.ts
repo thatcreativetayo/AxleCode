@@ -185,5 +185,7 @@ describe("credit formatting", () => {
     expect(formatCredits(12.5)).toBe("12.5");
     expect(formatCredits(91.5)).toBe("91.5");
     expect(formatCredits(0.5)).toBe("0.5");
+    expect(formatCredits(12.3456)).toBe("12.35");
+    expect(formatCredits(0.004)).toBe("0");
   });
 });

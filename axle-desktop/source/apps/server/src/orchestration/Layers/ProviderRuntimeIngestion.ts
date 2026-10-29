@@ -1082,12 +1082,12 @@ const make = Effect.gen(function* () {
   }) =>
     Effect.gen(function* () {
       const bufferedText = yield* takeBufferedAssistantText(input.messageId);
-      const text =
-        bufferedText.length > 0
-          ? bufferedText
-          : (input.fallbackText?.trim().length ?? 0) > 0
-            ? input.fallbackText!
-            : "";
+      const fallbackText =
+        (input.fallbackText?.trim().length ?? 0) > 0 ? input.fallbackText! : undefined;
+      // The completed item's detail is authoritative. When it is available,
+      // discard any unflushed stream buffer instead of appending it to the
+      // final text, and let the completion event replace the streamed text.
+      const text = fallbackText === undefined ? bufferedText : "";
       const hasRenderableText = hasRenderableAssistantText(text);
 
       if (hasRenderableText) {
@@ -1102,13 +1102,14 @@ const make = Effect.gen(function* () {
         });
       }
 
-      if (input.hasProjectedMessage || hasRenderableText) {
+      if (input.hasProjectedMessage || hasRenderableText || fallbackText !== undefined) {
         yield* orchestrationEngine.dispatch({
           type: "thread.message.assistant.complete",
           commandId: yield* providerCommandId(input.event, input.commandTag),
           threadId: input.threadId,
           messageId: input.messageId,
           ...(input.turnId ? { turnId: input.turnId } : {}),
+          ...(fallbackText !== undefined ? { text: fallbackText } : {}),
           createdAt: input.createdAt,
         });
       }
@@ -1761,8 +1762,6 @@ const make = Effect.gen(function* () {
           () => assistantCompletion.messageId,
         );
         const existingAssistantMessage = findMessageById(messages, assistantMessageId);
-        const shouldApplyFallbackCompletionText =
-          !existingAssistantMessage || existingAssistantMessage.text.length === 0;
 
         const shouldSkipRedundantCompletion =
           Option.isNone(activeAssistantMessageId) &&
@@ -1784,7 +1783,7 @@ const make = Effect.gen(function* () {
             commandTag: "assistant-complete",
             finalDeltaCommandTag: "assistant-delta-finalize",
             hasProjectedMessage: existingAssistantMessage !== undefined,
-            ...(assistantCompletion.fallbackText !== undefined && shouldApplyFallbackCompletionText
+            ...(assistantCompletion.fallbackText !== undefined
               ? { fallbackText: assistantCompletion.fallbackText }
               : {}),
           });

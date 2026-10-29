@@ -31,8 +31,8 @@ import {
 import { AxleLogo } from "./AxleLogo";
 import { SidebarAccountMenu } from "./account/SidebarAccountMenu";
 import { PluginsSidebarEntry } from "./plugins/PluginsSidebarEntry";
-import { CloudJobsSidebarEntry } from "./cloud/CloudJobsSidebarEntry";
-import { CloudSchedulesSidebarEntry } from "./cloud/CloudSchedulesSidebarEntry";
+// import { CloudJobsSidebarEntry } from "./cloud/CloudJobsSidebarEntry";
+// import { CloudSchedulesSidebarEntry } from "./cloud/CloudSchedulesSidebarEntry";
 import { PullRequestsSidebarEntry } from "./pullRequests/PullRequestsSidebarEntry";
 import { useAtomValue } from "@effect/atom-react";
 import { autoAnimate } from "@formkit/auto-animate";
@@ -3587,8 +3587,7 @@ const SidebarProjectsContent = memo(function SidebarProjectsContent(
             </CommandDialogTrigger>
           </SidebarMenuItem>
           <PullRequestsSidebarEntry />
-          <CloudJobsSidebarEntry />
-          <CloudSchedulesSidebarEntry />
+          {/* Cloud jobs and the standalone cloud schedules page are disabled. */}
           <PluginsSidebarEntry />
           <SidebarMenuItem>
             <SidebarMenuButton

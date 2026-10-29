@@ -45,7 +45,7 @@ describe("entitlement gates", () => {
 
   it("keeps GitHub free and locks the other plugins on the Free plan", () => {
     expect(pluginLockedForPlan(free, "github")).toBe(false);
-    for (const pluginId of ["jira", "notion", "gmail", "outlook", "slack", "sentry"]) {
+    for (const pluginId of ["jira", "notion", "gmail", "slack", "sentry", "figma"]) {
       expect(pluginLockedForPlan(free, pluginId)).toBe(true);
     }
   });

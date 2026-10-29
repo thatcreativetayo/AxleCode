@@ -36,8 +36,8 @@ pub trait LlmProvider: Send + Sync {
 
     /// Capabilities for `model` as served by this provider. Defaults to the
     /// shared model catalogue; adapters override when their wire protocol
-    /// diverges (for example the ChatGPT Codex Responses API has no
-    /// sampling parameters at all).
+    /// diverges (for example the OpenAI Responses API has no sampling
+    /// parameters at all).
     fn capabilities(&self, model: &str) -> ModelCapabilities {
         axle_config::model_capabilities(model)
     }

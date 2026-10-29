@@ -42,14 +42,15 @@ const cloudScheduleStore =
   cloudConfig && cloudDatabase
     ? createCloudScheduleStore(cloudDatabase.query, cloudConfig, billingConfig)
     : null;
+const cloudRevisions = createCloudRevisionResolver({
+  githubToken: NodeProcess.env.AXLE_GITHUB_TOKEN ?? null,
+});
 const scheduleRunner =
   cloudStore && cloudScheduleStore
     ? createCloudScheduleRunner({
         schedules: cloudScheduleStore,
         jobs: cloudStore,
-        revisions: createCloudRevisionResolver({
-          githubToken: NodeProcess.env.AXLE_GITHUB_TOKEN ?? null,
-        }),
+        revisions: cloudRevisions,
         log: (message, detail) => console.error(message, detail),
       })
     : null;
@@ -58,6 +59,7 @@ const handleCloudRequest = createCloudRequestHandler({
   billing: billingConfig,
   store: cloudStore,
   schedules: cloudScheduleStore,
+  revisions: cloudRevisions,
   runSchedule: scheduleRunner
     ? (userId, scheduleId) => scheduleRunner.runNow(userId, scheduleId)
     : null,

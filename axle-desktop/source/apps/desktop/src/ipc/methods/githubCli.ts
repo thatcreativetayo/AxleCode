@@ -13,7 +13,12 @@ import * as Schema from "effect/Schema";
 import { PositiveInt, TrimmedNonEmptyString } from "@axle/contracts";
 import * as IpcChannels from "../channels.ts";
 import * as DesktopIpc from "../DesktopIpc.ts";
-import { GITHUB_OAUTH_SCOPE, githubUserRepositoriesPath } from "./githubOAuth.ts";
+import {
+  GITHUB_OAUTH_SCOPE,
+  githubRepositoryBranchesPath,
+  githubRepositoryPath,
+  githubUserRepositoriesPath,
+} from "./githubOAuth.ts";
 import { isDefinitiveGitHubAuthFailure } from "./githubResilience.ts";
 import { buildGitHubPullRequestReviewPayload } from "@axle/shared/pullRequestReview";
 
@@ -73,6 +78,19 @@ const GitHubRepositoryListResultSchema = Schema.Struct({
   error: Schema.NullOr(Schema.String),
 });
 
+const GitHubBranchSchema = Schema.Struct({
+  name: Schema.String,
+  sha: Schema.String,
+  isDefault: Schema.Boolean,
+});
+
+const GitHubBranchListResultSchema = Schema.Struct({
+  repository: Schema.String,
+  defaultBranch: Schema.NullOr(Schema.String),
+  branches: Schema.Array(GitHubBranchSchema),
+  error: Schema.NullOr(Schema.String),
+});
+
 const GitHubPullRequestListResultSchema = Schema.Struct({
   repository: Schema.String,
   pullRequests: Schema.Array(GitHubPullRequestSchema),
@@ -99,6 +117,7 @@ const GitHubPullRequestCommentsResultSchema = Schema.Struct({
 });
 
 const ListRepositoriesInputSchema = Schema.Struct({ cwds: Schema.Array(Schema.String) });
+const ListBranchesInputSchema = Schema.Struct({ repository: Schema.String });
 const ListPullRequestsInputSchema = Schema.Struct({
   repository: Schema.String,
   scope: PullRequestScopeSchema,
@@ -222,9 +241,7 @@ const OAUTH_CALLBACK_TIMEOUT_MS = 5 * 60 * 1_000;
 const builtClientId =
   typeof __AXLE_GITHUB_CLIENT_ID__ === "string" ? __AXLE_GITHUB_CLIENT_ID__.trim() : "";
 const builtAuthBrokerUrl =
-  typeof __AXLE_GITHUB_AUTH_BROKER_URL__ === "string"
-    ? __AXLE_GITHUB_AUTH_BROKER_URL__.trim()
-    : "";
+  typeof __AXLE_GITHUB_AUTH_BROKER_URL__ === "string" ? __AXLE_GITHUB_AUTH_BROKER_URL__.trim() : "";
 
 const CLIENT_ID =
   process.env.AXLE_GITHUB_CLIENT_ID?.trim() ||
@@ -334,8 +351,7 @@ function configuredBrokerUrl(): string | null {
 }
 
 function authConfigurationError(): string | null {
-  if (!CLIENT_ID)
-    return "GitHub authentication is not configured: missing AXLE_GITHUB_CLIENT_ID.";
+  if (!CLIENT_ID) return "GitHub authentication is not configured: missing AXLE_GITHUB_CLIENT_ID.";
   if (!configuredBrokerUrl()) {
     return "GitHub authentication is not configured: AXLE_GITHUB_AUTH_BROKER_URL must be HTTPS (or loopback HTTP for development).";
   }
@@ -830,6 +846,61 @@ async function listRepositories(input: {
   }
 }
 
+async function listBranches(input: { repository: string }): Promise<{
+  repository: string;
+  defaultBranch: string | null;
+  branches: Array<{ name: string; sha: string; isDefault: boolean }>;
+  error: string | null;
+}> {
+  const empty = {
+    repository: input.repository,
+    defaultBranch: null,
+    branches: [] as Array<{ name: string; sha: string; isDefault: boolean }>,
+    error: null as string | null,
+  };
+  const status = await getGitHubCliStatus();
+  if (status.auth !== "authenticated") {
+    return { ...empty, error: status.detail ?? "GitHub is not authenticated." };
+  }
+  const [owner, name] = input.repository.split("/");
+  if (!owner || !name) return { ...empty, error: "Repository must be in owner/name form." };
+  try {
+    const info = await githubJson(githubRepositoryPath(input.repository));
+    const defaultBranch =
+      typeof info === "object" &&
+      info !== null &&
+      typeof (info as JsonRecord).default_branch === "string"
+        ? ((info as JsonRecord).default_branch as string)
+        : null;
+    const branches: Array<{ name: string; sha: string; isDefault: boolean }> = [];
+    const seen = new Set<string>();
+    for (let page = 1; page <= 10; page += 1) {
+      const value = await githubJson(githubRepositoryBranchesPath(input.repository, page));
+      if (!Array.isArray(value)) throw new Error("GitHub returned an invalid branch list.");
+      for (const entry of value) {
+        if (!entry || typeof entry !== "object") continue;
+        const item = entry as JsonRecord;
+        const commit = item.commit as JsonRecord | undefined;
+        if (typeof item.name !== "string" || typeof commit?.sha !== "string") continue;
+        if (seen.has(item.name)) continue;
+        seen.add(item.name);
+        branches.push({
+          name: item.name,
+          sha: commit.sha,
+          isDefault: item.name === defaultBranch,
+        });
+      }
+      if (value.length < 100) break;
+    }
+    branches.sort(
+      (a, b) => Number(b.isDefault) - Number(a.isDefault) || a.name.localeCompare(b.name),
+    );
+    return { repository: input.repository, defaultBranch, branches, error: null };
+  } catch (error) {
+    return { ...empty, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 function prFromRest(value: unknown): GitHubPullRequest | null {
   if (typeof value !== "object" || value === null) return null;
   const item = value as JsonRecord;
@@ -1282,6 +1353,13 @@ export const listRepositoriesMethod = DesktopIpc.makeIpcMethod({
   payload: ListRepositoriesInputSchema,
   result: GitHubRepositoryListResultSchema,
   handler: (input) => Effect.tryPromise(() => listRepositories(input)),
+});
+
+export const listBranchesMethod = DesktopIpc.makeIpcMethod({
+  channel: IpcChannels.GITHUB_CLI_LIST_BRANCHES_CHANNEL,
+  payload: ListBranchesInputSchema,
+  result: GitHubBranchListResultSchema,
+  handler: (input) => Effect.tryPromise(() => listBranches(input)),
 });
 
 export const list = DesktopIpc.makeIpcMethod({

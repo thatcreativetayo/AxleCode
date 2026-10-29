@@ -35,6 +35,7 @@ function PluginRow({
   connected,
   busy,
   disabled,
+  inactive,
   locked,
   onConnect,
   onDisconnect,
@@ -44,12 +45,21 @@ function PluginRow({
   readonly connected: boolean;
   readonly busy: boolean;
   readonly disabled: boolean;
+  readonly inactive: boolean;
   readonly locked: boolean;
   readonly onConnect: (pluginId: PluginId) => void;
   readonly onDisconnect: (pluginId: PluginId) => void;
   readonly onUpgrade: (pluginId: PluginId) => void;
 }) {
-  const actionLabel = busy ? "Working…" : connected ? "Disconnect" : locked ? "Upgrade" : "Connect";
+  const actionLabel = busy
+    ? "Working…"
+    : inactive
+      ? "Coming soon"
+      : connected
+        ? "Disconnect"
+        : locked
+          ? "Upgrade"
+          : "Connect";
   return (
     <li className="flex items-center gap-3 py-4 sm:gap-4">
       <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/30">
@@ -63,24 +73,33 @@ function PluginRow({
               <CheckIcon className="size-3" aria-hidden="true" /> Connected
             </span>
           ) : null}
-          {locked ? (
+          {inactive ? (
+            <span className="inline-flex items-center gap-1 rounded-md border border-border bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
+              Coming soon
+            </span>
+          ) : locked ? (
             <span className="inline-flex items-center gap-1 rounded-md border border-border bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
               <LockIcon className="size-3" aria-hidden="true" /> Paid plans
             </span>
           ) : null}
         </div>
         <p className="mt-1 text-xs leading-5 text-muted-foreground">
-          {locked ? `${plugin.description} — included with paid plans.` : plugin.description}
+          {inactive
+            ? `${plugin.description} — coming soon.`
+            : locked
+              ? `${plugin.description} — included with paid plans.`
+              : plugin.description}
         </p>
       </div>
       <Button
         type="button"
         size="sm"
         variant="outline"
-        disabled={disabled}
+        disabled={disabled || inactive}
         aria-label={`${actionLabel} ${plugin.name}`}
         aria-busy={busy}
         onClick={() => {
+          if (inactive) return;
           if (connected) {
             onDisconnect(plugin.id);
           } else if (locked) {
@@ -314,6 +333,7 @@ export function PluginsPage() {
                   connected
                   busy={busyPluginId === plugin.id}
                   disabled={busyPluginId !== null || loading || !hasPluginSession}
+                  inactive={false}
                   locked={false}
                   onConnect={connect}
                   onDisconnect={disconnect}
@@ -343,7 +363,8 @@ export function PluginsPage() {
                   connected={false}
                   busy={busyPluginId === plugin.id}
                   disabled={busyPluginId !== null || loading || !hasPluginSession}
-                  locked={pluginLocked(plugin.id)}
+                  inactive={plugin.inactive === true}
+                  locked={!plugin.inactive && pluginLocked(plugin.id)}
                   onConnect={connect}
                   onDisconnect={disconnect}
                   onUpgrade={() => openUpgradeDialog("plugins")}

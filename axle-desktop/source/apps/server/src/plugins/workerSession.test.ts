@@ -12,9 +12,9 @@ describe("plugin worker session", () => {
       "jira",
       "notion",
       "gmail",
-      "outlook",
       "slack",
       "sentry",
+      "figma",
     ]);
     expect(isSupportedPluginId("github")).toBe(true);
     expect(isSupportedPluginId("discord")).toBe(false);

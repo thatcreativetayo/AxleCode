@@ -87,21 +87,133 @@ test("admin analytics endpoint requires its dedicated bearer secret", async () =
   });
 });
 
-test("OAuth callback keeps the provider token-exchange error visible", async () => {
+test("Figma token exchange authenticates with Basic credentials", async () => {
   const store = makeKv();
   await store.put(
-    "oauth:test-outlook-state",
+    "oauth:test-figma-state",
     JSON.stringify({
       userId: "user_test",
-      pluginId: "outlook",
-      redirectUri: "https://auth.example/v1/plugins/outlook/callback",
+      pluginId: "figma",
+      redirectUri: "https://auth.example/v1/plugins/figma/callback",
       verifier: "verifier_test",
     }),
   );
   const env = {
     PLUGIN_STORE: store,
-    OUTLOOK_CLIENT_ID: "client-id",
-    OUTLOOK_CLIENT_SECRET: "client-secret",
+    FIGMA_CLIENT_ID: "figma-client-id",
+    FIGMA_CLIENT_SECRET: "figma-client-secret",
+  };
+  const originalFetch = globalThis.fetch;
+  let captured = null;
+  globalThis.fetch = async (url, init) => {
+    captured = { url: String(url), init };
+    return Response.json(
+      { error: "invalid_grant", error_description: "Authorization code expired." },
+      { status: 400 },
+    );
+  };
+  try {
+    const response = await handleWrappedRequest(
+      new Request(
+        "https://auth.example/v1/plugins/figma/callback?code=code-12345678&state=test-figma-state",
+      ),
+      env,
+    );
+    assert.equal(response.status, 502);
+    assert.equal(captured.url, "https://api.figma.com/v1/oauth/token");
+    assert.equal(
+      captured.init.headers.Authorization,
+      `Basic ${btoa("figma-client-id:figma-client-secret")}`,
+    );
+    const body = new URLSearchParams(captured.init.body);
+    assert.equal(body.get("code"), "code-12345678");
+    assert.equal(body.get("code_verifier"), "verifier_test");
+    assert.equal(body.get("redirect_uri"), "https://auth.example/v1/plugins/figma/callback");
+    assert.equal(body.get("client_id"), null);
+    assert.equal(body.get("client_secret"), null);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Slack callback joins public channels after connecting", async () => {
+  const store = makeKv();
+  await store.put(
+    "oauth:test-slack-state",
+    JSON.stringify({
+      userId: "user_test",
+      pluginId: "slack",
+      redirectUri: "https://auth.example/v1/plugins/slack/callback",
+      verifier: null,
+    }),
+  );
+  const env = {
+    PLUGIN_STORE: store,
+    SLACK_CLIENT_ID: "slack-client-id",
+    SLACK_CLIENT_SECRET: "slack-client-secret",
+    PLUGIN_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32).toString("base64url"),
+  };
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, init = {}) => {
+    const value = String(url);
+    calls.push({ url: value, init });
+    if (value === "https://slack.com/api/oauth.v2.access") {
+      return Response.json({
+        ok: true,
+        access_token: "xoxb-test-token",
+        token_type: "bot",
+        team: { id: "T1", name: "Test" },
+      });
+    }
+    if (value.startsWith("https://slack.com/api/conversations.list")) {
+      return Response.json({
+        ok: true,
+        channels: [
+          { id: "C1", is_member: false },
+          { id: "C2", is_member: true },
+        ],
+        response_metadata: { next_cursor: "" },
+      });
+    }
+    if (value === "https://slack.com/api/conversations.join") {
+      return Response.json({ ok: true });
+    }
+    throw new Error(`Unexpected fetch: ${value}`);
+  };
+  try {
+    const response = await handleWrappedRequest(
+      new Request(
+        "https://auth.example/v1/plugins/slack/callback?code=code-12345678&state=test-slack-state",
+      ),
+      env,
+    );
+    assert.equal(response.status, 200);
+    const joins = calls.filter(
+      (call) => call.url === "https://slack.com/api/conversations.join",
+    );
+    assert.equal(joins.length, 1);
+    assert.deepEqual(JSON.parse(joins[0].init.body), { channel: "C1" });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("OAuth callback keeps the provider token-exchange error visible", async () => {
+  const store = makeKv();
+  await store.put(
+    "oauth:test-gmail-state",
+    JSON.stringify({
+      userId: "user_test",
+      pluginId: "gmail",
+      redirectUri: "https://auth.example/v1/plugins/gmail/callback",
+      verifier: "verifier_test",
+    }),
+  );
+  const env = {
+    PLUGIN_STORE: store,
+    GMAIL_CLIENT_ID: "client-id",
+    GMAIL_CLIENT_SECRET: "client-secret",
   };
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () =>
@@ -112,7 +224,7 @@ test("OAuth callback keeps the provider token-exchange error visible", async () 
   try {
     const response = await handleWrappedRequest(
       new Request(
-        "https://auth.example/v1/plugins/outlook/callback?code=code-12345678&state=test-outlook-state",
+        "https://auth.example/v1/plugins/gmail/callback?code=code-12345678&state=test-gmail-state",
       ),
       env,
     );

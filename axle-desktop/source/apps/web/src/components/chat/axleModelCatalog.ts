@@ -3,7 +3,7 @@ import type { ModelCatalogSectionId } from "./ModelPickerSidebar";
 const SUB_PROVIDERS_BY_CATALOG: Readonly<Record<string, ReadonlyArray<string>>> = {
   "catalog:Axle": ["Axle"],
   "catalog:Claude": ["Claude"],
-  "catalog:OpenAI": ["OpenAI", "OpenAI Codex"],
+  "catalog:OpenAI": ["OpenAI"],
   "catalog:Google": ["Google"],
   "catalog:Fireworks": ["Fireworks"],
   "catalog:Ollama Cloud": ["Ollama Cloud"],

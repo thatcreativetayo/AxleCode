@@ -44,7 +44,7 @@ They meet at the NDJSON boundary implemented in `apps/server/src/provider/Layers
 - Streaming turns with proactive context compaction, overflow recovery and retry (`crates/axle_agent/src/loop_runner.rs:1916-2283`; `crates/axle_compaction/src/engine.rs`). **[V]**
 - 14 built-in Rust tools + 4 memory tools + MCP-imported tools; plan-mode tool restriction; per-tool approval flags; 300 s default timeout (`crates/axle_tools/src/registry.rs:23-225`, `bash.rs:73-79`). **[V]**
 - Session persistence as append-only JSONL with header validation, crash repair, compaction trimming (`crates/axle_session/src/manager.rs`). **[V]**
-- Provider coverage: OpenAI, Anthropic, Gemini, OpenRouter, Codex/ChatGPT-plan OAuth, plus CLI-level extra providers (fireworks, cerebras, groq, ollama, ollama-cloud) — see `04-ai-and-agent-systems.md`. **[V]**
+- Provider coverage: OpenAI, Anthropic, Gemini, OpenRouter, plus CLI-level extra providers (fireworks, cerebras, groq, ollama, ollama-cloud) — see `04-ai-and-agent-systems.md`. **[V]**
 - MCP server in the TS server exposing preview browser automation (`preview_*`), plugin auth/call, and PR review toolkits to the agent (`apps/server/src/mcp/`). **[V]**
 - Scheduled background tasks with atomic claim/advance in a single-row SQLite state table (`apps/server/src/schedules/Service.ts:42-43,162-172`). **[V]**
 - 32 SQLite migrations covering event-sourced orchestration + projections + auth scopes (`apps/server/src/persistence/Migrations/001..032`). **[V]**

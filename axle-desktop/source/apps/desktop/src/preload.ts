@@ -60,6 +60,13 @@ type GitHubRepositoryListResult = {
   error: string | null;
 };
 
+type GitHubBranchListResult = {
+  repository: string;
+  defaultBranch: string | null;
+  branches: Array<{ name: string; sha: string; isDefault: boolean }>;
+  error: string | null;
+};
+
 type GitHubPullRequestListResult = {
   repository: string;
   pullRequests: GitHubPullRequest[];
@@ -122,6 +129,7 @@ type ExtendedDesktopBridge = DesktopBridge & {
   disconnectGitHub: () => Promise<GitHubCliStatus>;
   syncGitHubPluginConnection: (input: { sessionToken: string }) => Promise<GitHubPluginSyncResult>;
   listGitHubRepositories: (input: { cwds: string[] }) => Promise<GitHubRepositoryListResult>;
+  listGitHubBranches: (input: { repository: string }) => Promise<GitHubBranchListResult>;
   listGitHubPullRequests: (input: {
     repository: string;
     scope: "all" | "authored";
@@ -245,6 +253,8 @@ contextBridge.exposeInMainWorld("desktopBridge", {
     ipcRenderer.invoke(IpcChannels.GITHUB_PLUGIN_SYNC_CHANNEL, input),
   listGitHubRepositories: (input) =>
     ipcRenderer.invoke(IpcChannels.GITHUB_CLI_LIST_REPOSITORIES_CHANNEL, input),
+  listGitHubBranches: (input) =>
+    ipcRenderer.invoke(IpcChannels.GITHUB_CLI_LIST_BRANCHES_CHANNEL, input),
   listGitHubPullRequests: (input) =>
     ipcRenderer.invoke(IpcChannels.GITHUB_CLI_LIST_PULL_REQUESTS_CHANNEL, input),
   getGitHubPullRequest: (input) =>

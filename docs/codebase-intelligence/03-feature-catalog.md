@@ -46,7 +46,7 @@ Each feature lists: purpose → files → execution trace → status.
 
 **Purpose:** stay under model context windows without losing the thread.
 **Files:** `crates/axle_compaction/src/engine.rs`; proactive call in the turn loop (`loop_runner.rs:2006-2108`).
-**Behavior:** threshold 80% of window, keep recent min(48k, window/3) tokens, summarizer at temp 0.3/max 2048 tokens, streaming-only (non-streaming rejected by ChatGPT Codex), writes a Compaction entry then trims + rewrites the session file (`engine.rs:8-33,98-196`).
+**Behavior:** threshold 80% of window, keep recent min(48k, window/3) tokens, summarizer at temp 0.3/max 2048 tokens, streaming-only, writes a Compaction entry then trims + rewrites the session file (`engine.rs:8-33,98-196`).
 **Status:** IMPLEMENTED; context-overflow recovery retries the turn once after forced compaction (`loop_runner.rs`).
 
 ## F7 — Memory

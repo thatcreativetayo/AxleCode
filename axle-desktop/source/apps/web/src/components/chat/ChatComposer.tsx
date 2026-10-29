@@ -104,6 +104,8 @@ import { Button } from "../ui/button";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { toastManager } from "../ui/toast";
+import { useLockedAxleModelSlugs } from "../../entitlements/axleModelAccess";
+import { openUpgradeDialog } from "../billing/UpgradeDialog";
 import {
   BotIcon,
   CheckIcon,
@@ -623,6 +625,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   } = props;
 
   const composerDraft = useComposerThreadDraft(composerDraftTarget);
+  const lockedAxleModelSlugs = useLockedAxleModelSlugs();
   const prompt = composerDraft.prompt;
   const composerImages = composerDraft.images;
   const composerTerminalContexts = workspaceContextEnabled ? composerDraft.terminalContexts : [];
@@ -1655,10 +1658,21 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
 
   const submitComposer = useCallback(
     (event?: { preventDefault: () => void }) => {
+      if (lockedAxleModelSlugs.has(selectedModel)) {
+        event?.preventDefault();
+        openUpgradeDialog("models");
+        return;
+      }
       onSend(event);
       if (shouldBlurMobileComposerOnSubmit()) blurMobileComposerAfterSend();
     },
-    [blurMobileComposerAfterSend, onSend, shouldBlurMobileComposerOnSubmit],
+    [
+      blurMobileComposerAfterSend,
+      lockedAxleModelSlugs,
+      onSend,
+      selectedModel,
+      shouldBlurMobileComposerOnSubmit,
+    ],
   );
 
   const expandMobileComposer = useCallback(() => {

@@ -3,18 +3,37 @@ import { MongoClient, MongoServerError, type Db } from "mongodb";
 
 const clients = new Map<string, MongoClient>();
 
-/** One lazily-connected client per connection string; isolates are long-lived. */
+const CLIENT_OPTIONS = {
+  maxPoolSize: 10,
+  minPoolSize: 0,
+  serverSelectionTimeoutMS: 5_000,
+  connectTimeoutMS: 5_000,
+} as const;
+
+/** Node callers keep a long-lived client per connection string. */
 export function mongoClient(uri: string): MongoClient {
   let client = clients.get(uri);
   if (!client) {
-    client = new MongoClient(uri, {
-      maxPoolSize: 10,
-      minPoolSize: 0,
-      serverSelectionTimeoutMS: 10_000,
-    });
+    client = new MongoClient(uri, CLIENT_OPTIONS);
     clients.set(uri, client);
   }
   return client;
+}
+
+export interface MongoConnection {
+  readonly client: MongoClient;
+  readonly db: Db;
+}
+
+/**
+ * Workers cannot create TCP sockets in global scope or reuse them across
+ * requests, so the Worker entrypoint opens (and closes) a client inside each
+ * handler. Caching a client there makes the first Mongo operation of the next
+ * request hang until the runtime cancels it.
+ */
+export function createMongoConnection(uri: string): MongoConnection {
+  const client = new MongoClient(uri, CLIENT_OPTIONS);
+  return { client, db: client.db(databaseNameFromUri(uri)) };
 }
 
 export function mongoDatabase(uri: string): Db {

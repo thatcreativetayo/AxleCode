@@ -5,16 +5,14 @@ import * as Effect from "effect/Effect";
 const DEFAULT_PLUGIN_WORKER_URL = "https://axle-auth.axle-download-worker.workers.dev";
 const SESSION_TOKEN_PATTERN = /^[A-Za-z0-9._~-]{20,4096}$/u;
 
-// Figma remains isolated in the auth worker for a future re-enable, but is not
-// a supported desktop/server plugin while it is retired.
 export const SUPPORTED_PLUGIN_IDS = [
   "github",
   "jira",
   "notion",
   "gmail",
-  "outlook",
   "slack",
   "sentry",
+  "figma",
 ] as const;
 
 export type SupportedPluginId = (typeof SUPPORTED_PLUGIN_IDS)[number];

@@ -144,9 +144,10 @@ interface UsageModelDoc {
   lastUsedAt: Date;
 }
 
-export function createAccountDatabase(config: AccountApiConfig) {
-  const db: Db = mongoDatabase(config.mongodbUri);
-
+export function createAccountDatabase(
+  config: AccountApiConfig,
+  db: Db = mongoDatabase(config.mongodbUri),
+) {
   const migrate = async (): Promise<void> => {
     await ensureMongoIndexes(db);
   };
@@ -156,20 +157,18 @@ export function createAccountDatabase(config: AccountApiConfig) {
     // version committed these two inserts in one transaction, but they are
     // independent defaults and each is idempotent, so ordering is irrelevant.
     await Promise.all([
-      db
-        .collection<ProfileDoc>("axle_account_profiles")
-        .updateOne(
-          { _id: userId },
-          {
-            $setOnInsert: {
-              displayName: null,
-              avatarUrl: null,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            },
+      db.collection<ProfileDoc>("axle_account_profiles").updateOne(
+        { _id: userId },
+        {
+          $setOnInsert: {
+            displayName: null,
+            avatarUrl: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
           },
-          { upsert: true },
-        ),
+        },
+        { upsert: true },
+      ),
       db.collection<StatsDoc>("axle_account_stats").updateOne(
         { _id: userId },
         {

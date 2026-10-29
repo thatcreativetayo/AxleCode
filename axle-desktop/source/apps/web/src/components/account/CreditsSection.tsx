@@ -398,63 +398,95 @@ function BuyCreditsSection() {
   return (
     <SettingsSection title="Buy credits" icon={<CoinsIcon />}>
       <div className="px-1 py-4">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <p className="max-w-prose text-xs leading-5 text-muted-foreground">
-            Credits never expire. $1 buys {formatCredits(CREDITS_PER_DOLLAR)} credits; packs start
-            at ${MIN_TOPUP_USD}.
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-foreground">Top up your Axle balance</p>
+            <p className="mt-1 max-w-prose text-xs leading-5 text-muted-foreground">
+              Credits never expire. $1 buys {formatCredits(CREDITS_PER_DOLLAR)} credits, and packs
+              start at ${MIN_TOPUP_USD}.
+            </p>
+          </div>
           {valid && amount !== null ? (
-            <Badge variant="secondary" size="sm">
+            <span className="text-sm font-medium tabular-nums text-foreground">
               {formatCredits(amount * CREDITS_PER_DOLLAR)} credits
-            </Badge>
+            </span>
           ) : null}
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          {TOPUP_PRESETS.map((preset) => (
-            <Button
-              key={preset}
-              size="sm"
-              variant="outline"
-              className={cn("h-8", amount === preset && "border-ring bg-accent")}
-              disabled={busy}
-              onClick={() => {
-                setAmount(preset);
-                void buy(preset);
-              }}
-            >
-              ${preset}
-            </Button>
-          ))}
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground">$</span>
-            <Input
-              type="number"
-              min={MIN_TOPUP_USD}
-              max={MAX_TOPUP_USD}
-              step="0.01"
-              value={amountText}
-              placeholder="Custom"
-              className="h-8 w-24 text-[13px]"
-              onChange={(event) => {
-                const parsed = Number(event.target.value);
-                setAmount(Number.isFinite(parsed) && parsed > 0 ? parsed : null);
-              }}
-            />
-            <Button
-              size="sm"
-              className="h-8"
-              disabled={busy || !valid}
-              onClick={() => amount !== null && void buy(amount)}
-            >
-              {busy ? (
-                <LoaderCircleIcon className="size-3.5 animate-spin" />
-              ) : (
-                <CoinsIcon className="size-3.5" />
-              )}
-              Buy credits
-            </Button>
-          </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {TOPUP_PRESETS.map((preset) => {
+            const selected = amount === preset;
+            return (
+              <button
+                key={preset}
+                type="button"
+                disabled={busy}
+                aria-pressed={selected}
+                onClick={() => setAmount(preset)}
+                className={cn(
+                  "flex flex-col gap-0.5 rounded-xl border px-3 py-2.5 text-left outline-none transition-colors",
+                  "focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50",
+                  selected
+                    ? "border-ring bg-accent/40"
+                    : "border-border bg-card/40 hover:border-border/80 hover:bg-muted/30",
+                )}
+              >
+                <span className="text-sm font-semibold text-foreground">${preset}</span>
+                <span className="text-[11px] tabular-nums text-muted-foreground">
+                  {formatCredits(preset * CREDITS_PER_DOLLAR)} credits
+                </span>
+              </button>
+            );
+          })}
         </div>
+
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
+          <label className="flex-1">
+            <span className="mb-1 block text-[11px] text-muted-foreground">
+              Custom amount (USD)
+            </span>
+            <div className="relative">
+              <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-xs text-muted-foreground">
+                $
+              </span>
+              <Input
+                type="number"
+                min={MIN_TOPUP_USD}
+                max={MAX_TOPUP_USD}
+                step="0.01"
+                value={amountText}
+                placeholder="Custom"
+                aria-label="Custom credit amount in USD"
+                className="h-9 pl-7 text-[13px]"
+                onChange={(event) => {
+                  const parsed = Number(event.target.value);
+                  setAmount(Number.isFinite(parsed) && parsed > 0 ? parsed : null);
+                }}
+              />
+            </div>
+          </label>
+          <Button
+            size="sm"
+            className="h-9 sm:min-w-40"
+            disabled={busy || !valid || !signedIn || accountApiUrl === null}
+            onClick={() => amount !== null && void buy(amount)}
+          >
+            {busy ? (
+              <LoaderCircleIcon className="size-3.5 animate-spin" />
+            ) : (
+              <CoinsIcon className="size-3.5" />
+            )}
+            {valid && amount !== null
+              ? `Buy ${formatCredits(amount * CREDITS_PER_DOLLAR)} credits`
+              : "Buy credits"}
+          </Button>
+        </div>
+
+        <p className="mt-2 text-[11px] leading-4 text-muted-foreground">
+          {signedIn
+            ? "Checkout opens in Bachs's secure hosted page. Credits are added as soon as payment completes."
+            : "Sign in to buy credits."}
+        </p>
         {error !== null ? (
           <p className="mt-2 text-[11px] leading-4 text-destructive-foreground">{error}</p>
         ) : null}

@@ -1,11 +1,13 @@
 import {
   CloudBillingView,
   CloudCheckoutSession,
+  CloudEnvironmentCatalog,
   CloudJob,
   CloudJobCreateInput,
   CloudJobEvent,
   CloudJobResponseInput,
 } from "@axle/contracts";
+import type { CloudEnvironmentSummary } from "@axle/contracts";
 import * as Schema from "effect/Schema";
 
 /**
@@ -51,6 +53,7 @@ const decodeEventList = Schema.decodeUnknownSync(
 );
 const decodeBilling = Schema.decodeUnknownSync(CloudBillingView);
 const decodeCheckout = Schema.decodeUnknownSync(CloudCheckoutSession);
+const decodeEnvironmentCatalog = Schema.decodeUnknownSync(CloudEnvironmentCatalog);
 
 export type CloudBilling = CloudBillingView;
 export type CloudCheckout = CloudCheckoutSession;
@@ -86,7 +89,7 @@ export class CloudJobsClient {
 
   constructor(
     transport: CloudJobsTransport,
-    fetchImpl: typeof globalThis.fetch = globalThis.fetch,
+    fetchImpl: typeof globalThis.fetch = globalThis.fetch.bind(globalThis),
   ) {
     this.baseUrl = transport.baseUrl;
     this.getToken = transport.getToken;
@@ -101,6 +104,19 @@ export class CloudJobsClient {
       body: input,
       decode: decodeCreatedJob,
     });
+  }
+
+  /**
+   * `GET /v1/cloud/environments` — the operator-configured environments with
+   * the provider/model pairs each one accepts.
+   */
+  async listEnvironments(): Promise<ReadonlyArray<CloudEnvironmentSummary>> {
+    const result = await this.request({
+      method: "GET",
+      path: "/v1/cloud/environments",
+      decode: decodeEnvironmentCatalog,
+    });
+    return result.environments;
   }
 
   /** `GET /v1/cloud/jobs` — the caller's jobs, newest first. */

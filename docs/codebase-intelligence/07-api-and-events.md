@@ -7,7 +7,7 @@ There are **five distinct communication systems**:
 1. Client ↔ server WebSocket RPC (`/ws`) for orchestration.
 2. Server ↔ agent NDJSON over stdio (the Axle protocol).
 3. Agent → server HTTP MCP (bearer-authenticated tool calls).
-4. HTTP routes on the server (auth-scoped: codex auth, OTLP proxy, assets, static).
+4. HTTP routes on the server (auth-scoped: OTLP proxy, assets, static).
 5. Cloud APIs: auth worker HTTP, relay HttpApi, download worker, Convex.
 
 ---
@@ -62,9 +62,6 @@ Note the deliberate two spellings: user-facing events are hyphenated (`thread.me
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
 | GET | `/ws` | Upgrade auth (`authenticateWebSocketUpgrade`) | Orchestration RPC socket |
-| GET | `/api/axle/codex-auth` | `orchestration:read` | Codex auth status (`http.ts:195-203`) |
-| POST | `/api/axle/codex-auth/login` | `orchestration:operate` | Start Codex login (`http.ts:204-211`) |
-| POST | `/api/axle/codex-auth/logout` | `orchestration:operate` | Clear Codex credentials (`http.ts:212-219`) |
 | POST | `/api/observability/v1/traces` | `orchestration:operate` | OTLP trace proxy (`OTLP_TRACES_PROXY_PATH`, `http.ts:43,242-297`) |
 | GET | asset route | — | Attachment/asset serving (`http.ts:297`) |
 | GET | static/dev route | — | Web app assets / dev server fallback (`http.ts:332`) |

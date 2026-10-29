@@ -28,10 +28,8 @@
 **Why it matters:** adding a model provider without parser support fails at runtime, not compile time.
 **Resolve by:** read `stream_parser.rs` fully + its tests; build the provider matrix table.
 
-## Q6 — Where are Codex OAuth tokens stored, and how are they refreshed?
-**Known [V]:** codex provider exists in the adapter; `AXLE_HOME/secrets/` exists for credentials. Exact file/format, refresh timing, and failure behavior ([U]).
-**Why it matters:** security review + "user logged out randomly" bugs.
-**Resolve by:** trace the codex provider auth path in `AxleAdapter.ts`/auth modules without printing secrets.
+## Q6 — Codex OAuth token storage — RESOLVED by removal (2026-10-25)
+The ChatGPT-plan OAuth provider, its login routes, and its token-storage path were removed from the product, so this question is no longer applicable.
 
 ## Q7 — MCP tokens: rotation, scoping, revocation? — RESOLVED 2026-10-18
 **Resolved [V]** (evidence: SEC-10 in doc 09): `McpSessionRegistry.ts` issues a fresh 32-byte credential per provider launch, stores only its SHA-256 hash, scopes it to one environment/thread/provider-session (plus cwd, auth session, plugin token, `preview` capability), expires it after 30 min idle or 8 h max, and revokes it on teardown/logout. Registry is in-memory (restart drops all) and there is no in-place rotation by design. Residual exposure is token presence in the child env (SEC-2), not scoping.

@@ -86,7 +86,7 @@ async fn loads_existing_sessions_with_opaque_provider_state() {
                 { "type": "text", "text": "The visible reply." },
                 {
                     "type": "provider_state",
-                    "provider": "openai-codex",
+                    "provider": "openai",
                     "data": {
                         "type": "reasoning",
                         "id": "reasoning-1",
@@ -96,7 +96,7 @@ async fn loads_existing_sessions_with_opaque_provider_state() {
                 }
             ],
             "timestamp": 1,
-            "provider": "openai-codex",
+            "provider": "openai",
             "model": "gpt-5.6-sol"
         }
     });
@@ -112,7 +112,7 @@ async fn loads_existing_sessions_with_opaque_provider_state() {
         matches!(
             part,
             ContentPart::ProviderState { provider, data }
-                if provider == "openai-codex"
+                if provider == "openai"
                     && data["encrypted_content"] == "opaque-state"
         )
     }));

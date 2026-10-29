@@ -94,7 +94,6 @@ Other invariants:
 | `anthropic` | `https://api.anthropic.com/v1/messages` | Anthropic key |
 | `gemini` | `generativelanguage.googleapis.com/v1beta` | Google key |
 | `openrouter` | `https://openrouter.ai/api/v1` | `OPENROUTER_API_KEY` |
-| `codex` | `POST https://api.openai.com/v1/responses` hardcoded (`codex.rs:145`) | ChatGPT-plan OAuth (`codex_auth.rs`): `auth.openai.com` authorize/token/discovery, dynamic client id, PKCE loopback redirect, plan scope check |
 
 - Abstractions: `CompletionOptions` (`provider.rs:11`), `LlmProvider { provider_name, capabilities, complete, stream }` (34-55).
 - Message parts: Text / Thinking / ProviderState (persisted, never rendered) / Image (`types.rs`); token estimation is heuristic: chars/4 plus 1024 per image (156-184).
@@ -114,7 +113,7 @@ Other invariants:
 - **`repair_tool_protocol` (371-426)** drops orphan/duplicate tool results and injects an `INTERRUPTED_TOOL_RESULT` — this is what makes crash recovery not poison the next turn.
 - `first_entry_id_for_recent_tokens` (465) and `trim_entries_before` (485) support token-budget trimming; `rewrite_session_file` (530+) is the compaction write-back.
 
-**Compaction** (`axle_compaction/src/engine.rs`): threshold 80 % of the context window; keep recent = min(48 000, window/3) tokens; 120 s timeout; `compact` requires ≥4 messages, `compact_now` ≥2; summarizer at temperature 0.3, max 2048 tokens; **streaming only** (ChatGPT Codex rejects non-streaming requests); writes a `Compaction` entry, then trims and rewrites the session file (8-196).
+**Compaction** (`axle_compaction/src/engine.rs`): threshold 80 % of the context window; keep recent = min(48 000, window/3) tokens; 120 s timeout; `compact` requires ≥4 messages, `compact_now` ≥2; summarizer at temperature 0.3, max 2048 tokens; **streaming only**; writes a `Compaction` entry, then trims and rewrites the session file (8-196).
 
 ## 7. Memory
 
@@ -151,7 +150,6 @@ Other invariants:
 | Approval timeout | Denial with explicit "do not retry automatically" text |
 | Command timeout | Process killed; empty partial output returned with `timed_out` surfaced to the event/UI |
 | Server process dies | Decoder fails open with a retryable error class; adapter reconnects up to 5× with 1→16 s backoff (`AxleAdapter.ts:141-179`) |
-| Non-streaming summarizer | Rejected by ChatGPT Codex provider — compaction is streaming-only by necessity |
 
 ## 11. Gaps and risks in the agent system
 

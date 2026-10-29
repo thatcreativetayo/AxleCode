@@ -314,17 +314,6 @@ export default function DocsPage() {
               </code>{" "}
               by default. A localhost endpoint does not require a provider key.
             </p>
-            <h3 className="font-medium text-paper">
-              Codex subscription authentication
-            </h3>
-            <p>
-              The runtime supports subscription authentication through{" "}
-              <code className="text-xs text-paper">--codex-login</code>. Use{" "}
-              <code className="text-xs text-paper">--codex-auth-status</code> to
-              inspect the connection and{" "}
-              <code className="text-xs text-paper">--codex-logout</code> to
-              disconnect it.
-            </p>
             <Note>
               Model availability and capabilities vary by provider and account.
               A provider listing does not include its paid usage in Axle.

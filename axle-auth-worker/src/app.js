@@ -1,4 +1,10 @@
-import { authenticatePluginSession, handleRequest, pluginPlanAllows, PLUGIN_IDS } from "./index.js";
+import {
+  authenticatePluginSession,
+  handleRequest,
+  pluginPlanAllows,
+  PLUGIN_IDS,
+  PROVIDERS,
+} from "./index.js";
 
 const MAX_BODY_BYTES = 64 * 1024;
 const ANALYTICS_PREFIX = "analytics:user:";
@@ -201,10 +207,7 @@ async function startFigmaAuthorization(request, env, session) {
   url.searchParams.set("redirect_uri", redirectUri);
   url.searchParams.set("response_type", "code");
   url.searchParams.set("state", state);
-  url.searchParams.set(
-    "scope",
-    "current_user:read,file_content:read,file_comments:read,file_comments:write",
-  );
+  url.searchParams.set("scope", PROVIDERS.figma.scopes.join(","));
   url.searchParams.set("code_challenge", challenge);
   url.searchParams.set("code_challenge_method", "S256");
   return json({ pluginId: "figma", status: "pending", authorizationUrl: url.toString() });
@@ -254,13 +257,10 @@ async function handleFigmaCallback(request, env) {
       method: "POST",
       headers: {
         Accept: "application/json",
+        Authorization: figmaBasicAuth(config),
         "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: new URLSearchParams({
-        client_id: config.clientId,
-        client_secret: config.clientSecret,
-        ...tokenFields,
-      }),
+      body: new URLSearchParams(tokenFields),
     });
     const value = await response.json().catch(() => ({}));
     if (!response.ok) {
